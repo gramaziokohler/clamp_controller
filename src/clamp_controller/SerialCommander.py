@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple
 import serial.tools.list_ports
 from serial import Serial
 
-from ClampModel import ClampModel
+from clamp_controller.ClampModel import ClampModel
 from serial_radio_transport_driver.Message import Message
 from serial_radio_transport_driver.ReliableMessenger import ReliableMessenger
 from serial_radio_transport_driver.SerialTransport import SerialRadioTransport

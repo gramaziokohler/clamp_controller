@@ -6,7 +6,7 @@ from queue import Queue
 from tkinter import ttk
 from types import SimpleNamespace
 
-from ClampModel import ClampModel
+from clamp_controller.ClampModel import ClampModel
 from serial.tools import list_ports
 
 logger_ui = logging.getLogger("app.UI")

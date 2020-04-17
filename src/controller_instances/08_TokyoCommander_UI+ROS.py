@@ -9,9 +9,9 @@ from threading import Thread
 from tkinter import ttk
 from types import SimpleNamespace
 
-from ClampModel import ClampModel
-from CommanderGUI import *
-from RosClampCommandListener import RosClampCommandListener
+from clamp_controller.ClampModel import ClampModel
+from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gui
+from clamp_controller.RosClampCommandListener import RosClampCommandListener
 from SerialCommanderTokyo import SerialCommanderTokyo
 
 

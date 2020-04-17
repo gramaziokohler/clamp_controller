@@ -1,6 +1,6 @@
-from ClampModel import ClampModel
+from clamp_controller.ClampModel import ClampModel
+from clamp_controller.SerialCommander import SerialCommander
 from roslibpy import Ros
-from SerialCommander import SerialCommander
 
 # SerialCommanderTokyo is a SErialCommander that contains the initialization of the clamps
 # used in the Tokyo project.
