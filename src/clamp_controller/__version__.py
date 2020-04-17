@@ -1,0 +1,8 @@
+__title__ = 'clamp_controller'
+__description__ = 'Remote clamp controlling library'
+__url__ = 'https://github.com/gramaziokohler/clamp_controller'
+__version__ = '1.0.0'
+__author__ = 'Victor Leung, Gramazio Kohler Research'
+__author_email__ = 'leung@arch.ethz.ch'
+__license__ = 'MIT license'
+__copyright__ = 'Copyright 2018 Gramazio Kohler Research'
