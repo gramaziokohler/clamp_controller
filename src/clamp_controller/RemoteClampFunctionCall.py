@@ -19,12 +19,15 @@ import roslibpy
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 from roslibpy import Ros
+import compas
 
 class RemoteClampFunctionCall(Ros):
         
-    def __init__(self, host_ip:str):
-        from twisted.internet import reactor
-        reactor.timeout = lambda : 0.00001
+    def __init__(self, host_ip):
+        if not compas.IPY:
+            from twisted.internet import reactor
+            reactor.timeout = lambda : 0.00001    
+
         Ros.__init__(self, host=host_ip, port=9090)
         self.run()
 
@@ -68,8 +71,12 @@ class RemoteClampFunctionCall(Ros):
         # Send an initial message Sequence id will be -1
         self.send_ros_command("ROS_NEW_SENDER_INITIALIZE", "")
 
-    # Returns the sequence_id of sent message
-    def send_ros_command(self, instruction_type: str, instruction_body: str):
+    
+    def send_ros_command(self, instruction_type, instruction_body):
+        """ Sends a ROS command to /clamp_command channel and returns the sequence_id of sent message
+        instruction_type: str
+        instruction_body; str
+        """
         # Create message to send
         message = {}
         message['sequence_id'] = self.sequence_id
@@ -85,7 +92,9 @@ class RemoteClampFunctionCall(Ros):
         return self.sequence_id - 1
     
     # Return true if sending is successful. False if timeout
-    def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id: str, position: float, velocity: float, timeout_ms: int = 1000) -> bool:
+    def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id, position, velocity, timeout_ms = 1000):
+        """clamps_id: str, position: float, velocity: float, timeout_ms: int = 1000) -> bool:
+        """
         start_time = current_milli_time()
         sequence_id = self.send_ROS_VEL_GOTO_COMMAND(clamps_id, position, velocity)
         while (current_milli_time() - start_time < timeout_ms):
@@ -95,14 +104,15 @@ class RemoteClampFunctionCall(Ros):
         return False
 
     # Returns the sequence_id of sent message
-    def send_ROS_VEL_GOTO_COMMAND(self, clamps_id: str, position: float, velocity: float) -> int:
+    def send_ROS_VEL_GOTO_COMMAND(self, clamps_id, position, velocity):
+        """send_ROS_VEL_GOTO_COMMAND(self, clamps_id: str, position: float, velocity: float) -> int:"""
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id, position, velocity))
         return self.send_ros_command("ROS_VEL_GOTO_COMMAND",instructions)
          
     # Returns the sequence_id of sent message
-    def send_ROS_STOP_COMMAND(self, clamps_id: str):
+    def send_ROS_STOP_COMMAND(self, clamps_id):
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id))
@@ -116,7 +126,7 @@ class RemoteClampFunctionCall(Ros):
 if __name__ == "__main__":
 
     hostip = '192.168.0.117'
-    clamps_connection = TokyoClampCommunicationViaRos(hostip)
+    clamps_connection = RemoteClampFunctionCall(hostip)
 
     # Command to send clamp to target (non-blocking)
     # clamps_connection.send_ROS_VEL_GOTO_COMMAND(100.0, 1.0)
@@ -132,7 +142,7 @@ if __name__ == "__main__":
             break
         if i == 's':
             # Stop
-            clamps_connection.send_ROS_STOP_COMMAND(['1','2'])
+            clamps_connection.send_ROS_STOP_COMMAND(['3'])
             continue
         else:
             # Goto Pos,Vel
@@ -145,7 +155,7 @@ if __name__ == "__main__":
             except:
                 print ("Bad Input, position range (95-220). Try again:\n")
                 continue
-            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['1','2'],position, velocity)
+            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['3'],position, velocity)
             if success: 
                 print ("send_ROS_VEL_GOTO_COMMAND_wait() Message Success (Clamp Ack)")
             else:
