@@ -20,13 +20,14 @@ class SerialCommanderFred(SerialCommander):
 
         # Batt Min Max Value 860 to 1004 is calibrated according to the LiPo Charger's percentage reference
         # It is safe to use the battery to 0% as indicated here.
-        self.clamp1: ClampModel = ClampModel('1', 918, 95.0, 94.0, 225.0, 860.0, 1004.0)
-        self.clamp2: ClampModel = ClampModel('2', 918, 95.0, 94.0, 225.0, 860.0, 1004.0)
-        self.clamp3: ClampModel = ClampModel('3', 918, 95.0, 94.0, 225.0, 860.0, 1004.0)
-        self.clamp4: ClampModel = ClampModel('4', 918, 95.0, 94.0, 225.0, 860.0, 1004.0)
+        self.clamp1: ClampModel = ClampModel('1', 918, 0, 94.0, 225.0, 860.0, 1004.0)
+        self.clamp2: ClampModel = ClampModel('2', 918, 0, 94.0, 225.0, 860.0, 1004.0)
+        self.clamp3: ClampModel = ClampModel('3', 918, 0, 94.0, 225.0, 860.0, 1004.0)
+        self.clamp4: ClampModel = ClampModel('4', 918, 0, 94.0, 225.0, 860.0, 1004.0)
         self.add_clamp(self.clamp1)
         self.add_clamp(self.clamp2)
         self.add_clamp(self.clamp3)
         self.add_clamp(self.clamp4)
 
         self.ros_client: Ros = None
+        self.status_update_interval_low_ms = 950

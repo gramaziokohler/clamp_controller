@@ -148,6 +148,18 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                 results = commander.set_clamps_velocity(clamps_to_communicate, velocity)
                 logger_ctr.info("Sending Velocity command (%s) to %s, results = %s" % (velocity, clamps_to_communicate, results))
 
+            # Handelling CMD_POWER
+            if msg.type == BackgroundCommand.CMD_POWER:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+                # Instruct commander to send command
+                power = msg.power
+                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                results = commander.set_clamps_power(clamps_to_communicate, power)
+                logger_ctr.info("Sending Power command (%s) to %s, results = %s" % (power, clamps_to_communicate, results))
+
+
             # Handelling ROS_VEL_GOTO_COMMAND
             if msg.type == BackgroundCommand.ROS_VEL_GOTO_COMMAND:
                 if not commander.is_connected:
