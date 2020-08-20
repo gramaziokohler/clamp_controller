@@ -23,6 +23,8 @@ class BackgroundCommand(Enum):
     ROS_VEL_GOTO_COMMAND = 8
     ROS_STOP_COMMAND = 9
 
+    CMD_POWER = 10
+
 
 def create_commander_gui(root, q: Queue, clamps):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)
@@ -138,7 +140,10 @@ def create_ui_control(root, q: Queue):
     # Title and frame
     title = tk.Label(root, text="Control")
     title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
-    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame_outside = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame_outside.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
     # Buttons
@@ -147,11 +152,11 @@ def create_ui_control(root, q: Queue):
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_GOTO, position=position))
 
     tk.Label(frame, text="Go to Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
-    tk.Button(frame, text="95mm", command=lambda: on_goto_button_click(95)).pack(side=tk.LEFT)
-    tk.Button(frame, text="97mm", command=lambda: on_goto_button_click(97)).pack(side=tk.LEFT)
+    tk.Button(frame, text="101mm", command=lambda: on_goto_button_click(101)).pack(side=tk.LEFT)
+    tk.Button(frame, text="102mm", command=lambda: on_goto_button_click(102)).pack(side=tk.LEFT)
     tk.Button(frame, text="110mm", command=lambda: on_goto_button_click(110)).pack(side=tk.LEFT)
-    tk.Button(frame, text="112mm", command=lambda: on_goto_button_click(112)).pack(side=tk.LEFT)
     tk.Button(frame, text="140mm", command=lambda: on_goto_button_click(140)).pack(side=tk.LEFT)
+    tk.Button(frame, text="155mm", command=lambda: on_goto_button_click(155)).pack(side=tk.LEFT)
     tk.Button(frame, text="170mm", command=lambda: on_goto_button_click(170)).pack(side=tk.LEFT)
     tk.Button(frame, text="200mm", command=lambda: on_goto_button_click(200)).pack(side=tk.LEFT)
     tk.Button(frame, text="220mm", command=lambda: on_goto_button_click(220)).pack(side=tk.LEFT)
@@ -189,6 +194,20 @@ def create_ui_control(root, q: Queue):
 
     tk.Label(frame, text="Home: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     tk.Button(frame, text="Home Now", command=on_home_button_click).pack(side=tk.LEFT)
+
+    def on_power_button_click(power):
+        logger_ui.info("Button Pressed: Set Power %s" % power)
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_POWER, power=power))
+
+    frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    tk.Label(frame, text="Set Power: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=00)
+    tk.Button(frame, text="20%", command=lambda: on_power_button_click(20)).pack(side=tk.LEFT)
+    tk.Button(frame, text="40%", command=lambda: on_power_button_click(40)).pack(side=tk.LEFT)
+    tk.Button(frame, text="50%", command=lambda: on_power_button_click(50)).pack(side=tk.LEFT)
+    tk.Button(frame, text="60%", command=lambda: on_power_button_click(60)).pack(side=tk.LEFT)
+    tk.Button(frame, text="65%", command=lambda: on_power_button_click(65)).pack(side=tk.LEFT)
 
     return ui_handles
 

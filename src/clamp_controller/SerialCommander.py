@@ -276,3 +276,35 @@ class SerialCommander(object):
             success = self.set_clamp_velocity(clamp, velocity_mm_sec)
             successes.append(success)
         return successes
+
+    def set_clamp_power(self, clamp: ClampModel, power_pct: float) -> bool:
+
+        # Check power min max
+        this_clamp_power_Min_pct = 1  # TO Do. Integrate this into clampModel
+        this_clamp_power_Max_pct = 100  # TO Do. Integrate this into clampModel
+        if (power_pct < this_clamp_power_Min_pct):
+            #raise ValueError("Target Power (%s) < Limit (%s)" % (power_pct, this_clamp_power_Min_pct))
+            self.logger.error("Target Power (%s) < Limit (%s)" % (power_pct, this_clamp_power_Min_pct))
+            return False
+        if (power_pct > this_clamp_power_Max_pct):
+            #raise ValueError("Target Power (%s) > Limit (%s)" % (power_pct, this_clamp_power_Max_pct))
+            self.logger.error("Target Power (%s) > Limit (%s)" % (power_pct, this_clamp_power_Max_pct))
+            return False
+
+
+        # Send message to clamp
+        message =  "p%0.1f"%(power_pct)
+        response = self.message_clamp(clamp, message)
+        success = response is not None
+        # Record this last sent value
+        if success:
+            clamp._last_set_power = power_pct
+        self.logger.info("set_clamp_power(%s,%s), message = %s, success = %s"%(clamp, power_pct, message, success))
+        return success
+
+    def set_clamps_power(self, clamps: List[ClampModel], power_pct: float) -> List[bool]:
+        successes = []
+        for clamp in clamps:
+            success = self.set_clamp_power(clamp, power_pct)
+            successes.append(success)
+        return successes
