@@ -25,7 +25,8 @@ class SerialCommander(object):
         self.serial_default_retry: int = 3
         self.serial_default_timeout: int = 100
         self.logger = logging.getLogger("app.cmd")
-        self.status_update_high_freq: bool = False
+        self.status_update_high_freq: bool = False  # Flag that indicate update status interval to be in high frequency (when clamps are in motion)
+        
         pass
 
     @property
@@ -39,12 +40,13 @@ class SerialCommander(object):
         else:
             return self.status_update_interval_low_ms
 
-    ''' Launch a GUI to allow user to select a COM PORT.
-    Then, connect to that COM port
-    return true if success
-    '''
 
-    def connect_with_CLI(self):
+
+    def connect_with_CLI(self) -> bool:
+        """" Launch a CLI based interface to allow user to select a COM PORT.
+        Connect to that COM port
+        return true if success
+        """
         # Check connected COM ports
         ports = list(serial.tools.list_ports.comports())
         if len(ports) == 0:
@@ -65,11 +67,10 @@ class SerialCommander(object):
 
         return self.connect(selected_port)
 
-    ''' Connect to a specified COM port
-    return true if success
-    '''
-
     def connect(self, port_name: str):
+        """ Connect to a specified COM Port by Name
+        return True if success
+        """
         # Check if existing port is connected, if so, disconned first:
         if (self.serial_port is not None):
             if (self.serial_port.isOpen()):
@@ -93,7 +94,9 @@ class SerialCommander(object):
         self.logger.info("Connected to %s." % (serial_port.port))
         return True
 
-    def add_clamp(self, clamp: ClampModel):
+    def add_clamp(self, clamp: ClampModel) -> None:
+        """ Add a ClampModel instance to be managed by this commander
+        """
         clamp.last_comm_time = None
         #clamp.last_comm_lqi = None
         #clamp.last_comm_rssi = None
@@ -101,6 +104,9 @@ class SerialCommander(object):
         self.clamps[clamp.receiver_address] = clamp
 
     def update_all_clamps_status(self, retry: int = 0, time_out_millis: int = 40):
+        """ Update the status of all clamps.
+        Returns a list of boolean that represent whether update is a success
+        """
         results = []
         for address, clamp in self.clamps.items():
             result = self.update_clamp_status(clamp, retry=retry, time_out_millis=time_out_millis)
@@ -113,7 +119,8 @@ class SerialCommander(object):
         return results
 
     def update_clamp_status(self, clamp: ClampModel, retry: int = 0, time_out_millis: int = 40) -> bool:
-        # Send empty message to clamp , without auto status update
+        """ Update the status of one clamp
+        """
         response = self.message_clamp(clamp, "_", retry=retry, time_out_millis=time_out_millis, update_clamp_status=False)
         if response is not None:
             # Update clamp status
@@ -160,6 +167,8 @@ class SerialCommander(object):
         return None
 
     def sync_clamps_move(self, clamp_pos_velo_list: List[Tuple[ClampModel, float, float]]) -> bool:
+        """Commands a list of clamps to perform a syncronous move
+        """
         # This higher level function does not perform value min max check.
 
         # clamp_pos_velo_list is a list of clamps to syncrously move.
@@ -174,6 +183,7 @@ class SerialCommander(object):
             success = self.set_clamp_velocity(clamp, velocity_mm_sec)
             successes.append(success)
         if not all(successes):
+            self.logger.warning("Sync Clamp Move Not Successful at velocity setting step. Successes: %s" % successes)
             return False
 
         # Send Goto Command
@@ -219,6 +229,8 @@ class SerialCommander(object):
         return success
 
     def home_clamps(self, clamps: List[ClampModel]) -> List[bool]:
+        """Command multiple clamps to home.
+        """
         successes = []
         for clamp in clamps:
             response = self.message_clamp(clamp, "h")
@@ -230,6 +242,8 @@ class SerialCommander(object):
         return successes
 
     def stop_clamps(self, clamps: List[ClampModel]) -> List[bool]:
+        """Stop multiple clamps
+        """ 
         successes = []
         for clamp in clamps:
             response = self.message_clamp(clamp, "s")
@@ -237,6 +251,8 @@ class SerialCommander(object):
         return successes
 
     def stop_all_clamps(self) -> List[bool]:
+        """Command all clamps managed by this controller to stop immediately
+        """
         successes = self.stop_clamps(self.clamps.values())
         if all(successes):
             self.logger.info("stop_clamps() issued. All clamps are stopped. Status Update Freq = Low")
@@ -244,7 +260,8 @@ class SerialCommander(object):
         return successes
 
     def set_clamp_velocity(self, clamp: ClampModel, velocity_mm_sec: float) -> bool:
-
+        """ Set the velocity setting of a clamp
+        """
         # Check velocity min max
         this_clamp_VelocityMin_mm_sec = 0.01  # TO Do. Integrate this into clampModel
         this_clamp_VelocityMax_mm_sec = 10.0  # TO Do. Integrate this into clampModel
@@ -271,6 +288,9 @@ class SerialCommander(object):
         return success
 
     def set_clamps_velocity(self, clamps: List[ClampModel], velocity_mm_sec: float) -> List[bool]:
+        """Set the velocity setting of multiple clamps
+        Return a list of boolean values whether the command is successfully ACKed.
+        """
         successes = []
         for clamp in clamps:
             success = self.set_clamp_velocity(clamp, velocity_mm_sec)
@@ -278,7 +298,8 @@ class SerialCommander(object):
         return successes
 
     def set_clamp_power(self, clamp: ClampModel, power_pct: float) -> bool:
-
+        """ Set the power setting of a clamp
+        """
         # Check power min max
         this_clamp_power_Min_pct = 1  # TO Do. Integrate this into clampModel
         this_clamp_power_Max_pct = 100  # TO Do. Integrate this into clampModel
@@ -303,6 +324,10 @@ class SerialCommander(object):
         return success
 
     def set_clamps_power(self, clamps: List[ClampModel], power_pct: float) -> List[bool]:
+        """Set the power setting of multiple clamps
+        power_pct can range from 0.0 to 100.0
+        Return a list of boolean values whether the command is successfully ACKed.
+        """
         successes = []
         for clamp in clamps:
             success = self.set_clamp_power(clamp, power_pct)
