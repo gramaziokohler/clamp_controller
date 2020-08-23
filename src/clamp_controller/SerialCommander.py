@@ -26,7 +26,9 @@ class SerialCommander(object):
         self.serial_default_timeout: int = 100
         self.logger = logging.getLogger("app.cmd")
         self.status_update_high_freq: bool = False  # Flag that indicate update status interval to be in high frequency (when clamps are in motion)
-        
+        self.sync_move_inaction = False             # Flag to indicate sync move in action and monitor if any clamp stopped.
+        self.sync_move_clamp_pos_velo_list = None # type: List[Tuple[ClampModel, float, float]]
+
         pass
 
     @property
@@ -196,6 +198,9 @@ class SerialCommander(object):
                 self.stop_clamps(processed_clamps)
                 return False
 
+        # Keep the status of this sync move for later monitoring 
+        self.sync_move_inaction = True
+        self.sync_move_clamp_pos_velo_list = clamp_pos_velo_list
         # If nothing went wrong, this is a success
         return True
 

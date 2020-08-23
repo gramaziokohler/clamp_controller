@@ -30,9 +30,9 @@ def current_milli_time(): return int(round(time.time() * 1000))
 # Initialize logger for the controller
 logger_ctr = logging.getLogger("app.ctr")
 logger_ros = logging.getLogger("app.ros")
+logger_sync = logging.getLogger("app.sync")
 # Initialize multi-tasking variables.
 last_status_update_time = 0
-
 
 def background_thread(guiref, commander: SerialCommanderFred, q):
     # This is a sudo time-split multi-task with priority execution.
@@ -43,6 +43,8 @@ def background_thread(guiref, commander: SerialCommanderFred, q):
         if handle_background_commands(guiref, commander, q):
             continue
         if update_status(guiref, commander):
+            # Check sync move if there is a new status update.
+            check_sync_move(guiref, commander)
             continue
     logging.getLogger("app.bg").info("Background Thread Stopped")
 
@@ -205,10 +207,11 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
     except queue.Empty:
         return False
 
-        # Update Status
-
 
 def update_status(guiref, commander: SerialCommanderFred):
+    """Regularly calling the commander to poll clamps for a status.
+    Updates the GUI labels upon a successful poll. ALso updates the last communicated time if unsuccessful. 
+    """
     global last_status_update_time
     if ((commander.serial_port is None) or (not commander.serial_port.isOpen())):
         return False
@@ -258,6 +261,33 @@ def update_status(guiref, commander: SerialCommanderFred):
                 guiref['status'][clamp.receiver_address]['last_pos'].set("%04.1fmm" % clamp._last_set_position)
             if clamp._last_set_velocity is not None:
                 guiref['status'][clamp.receiver_address]['last_vel'].set("%3.1fmm/s" % clamp._last_set_velocity)
+        return True
+    else:
+        return False
+
+def check_sync_move(guiref, commander: SerialCommanderFred, target_reach_threshold = 0.5):
+    """ Perhaps a checks if the commander.sync_move_inaction flag is True.
+    This function checks all the clamps in commander.sync_move_clamp_pos_velo_list
+    The following check is performed:
+    - If any clamp in the list have not reached its target (within threshold) and have stopped moveing.
+    - Maybe other checkes will be added in the future.
+    This function will request the commander to stop all clamps involved.
+    """ 
+    if commander.sync_move_inaction:
+        for clamp, target_jaw_position, velo in commander.sync_move_clamp_pos_velo_list:
+            # Check every clamp that should be moving
+            target_reached = abs(target_jaw_position - clamp.currentJawPosition) < target_reach_threshold
+            if clamp.isMotorRunning == False and target_reached == False:
+                logger_sync.warning("Sync Move Check Failed: %s stopped at %0.1fmm before reaching target %0.1fmm. Initializing stop all clamps." % (clamp, clamp.currentJawPosition, target_jaw_position))
+                # Stop all other clamps involved in the sync move
+                commander.stop_clamps([c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp])
+                commander.sync_move_inaction = False
+        # Cancels the flag if all clamps reached target or stopped.
+        if not any([c.isMotorRunning for c, _, _ in commander.sync_move_clamp_pos_velo_list]):
+            commander.sync_move_inaction = False
+            logger_sync.info("Sync Move Check Completed. All clamps stopped. Flag is reset. Details:")
+            for clamp, target_jaw_position, _ in commander.sync_move_clamp_pos_velo_list:
+                logger_sync.info("Sync Move - %s current_pos = %0.1fmm (target = %0.1fmm)" % (clamp, clamp.currentJawPosition, target_jaw_position))
         return True
     else:
         return False
