@@ -280,7 +280,10 @@ def check_sync_move(guiref, commander: SerialCommanderFred, target_reach_thresho
             if clamp.isMotorRunning == False and target_reached == False:
                 logger_sync.warning("Sync Move Check Failed: %s stopped at %0.1fmm before reaching target %0.1fmm. Initializing stop all clamps." % (clamp, clamp.currentJawPosition, target_jaw_position))
                 # Stop all other clamps involved in the sync move
-                commander.stop_clamps([c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp])
+                successes = [False]
+                for _ in range(5):
+                    if not all (successes):
+                        successes = commander.stop_clamps([c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp])
                 commander.sync_move_inaction = False
         # Cancels the flag if all clamps reached target or stopped.
         if not any([c.isMotorRunning for c, _, _ in commander.sync_move_clamp_pos_velo_list]):
