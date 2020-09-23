@@ -208,6 +208,10 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="50%", command=lambda: on_power_button_click(50)).pack(side=tk.LEFT)
     tk.Button(frame, text="60%", command=lambda: on_power_button_click(60)).pack(side=tk.LEFT)
     tk.Button(frame, text="65%", command=lambda: on_power_button_click(65)).pack(side=tk.LEFT)
+    tk.Button(frame, text="70%", command=lambda: on_power_button_click(70)).pack(side=tk.LEFT)
+    tk.Button(frame, text="75%", command=lambda: on_power_button_click(75)).pack(side=tk.LEFT)
+    tk.Button(frame, text="80%", command=lambda: on_power_button_click(80)).pack(side=tk.LEFT)
+    tk.Button(frame, text="90%", command=lambda: on_power_button_click(90)).pack(side=tk.LEFT)
 
     return ui_handles
 
