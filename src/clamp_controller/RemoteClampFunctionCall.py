@@ -23,21 +23,21 @@ import compas
 
 class RemoteClampFunctionCall(Ros):
         
-    def __init__(self, host_ip):
+    def __init__(self, host_ip, status_change_callback=None):
         if not compas.IPY:
             from twisted.internet import reactor
             reactor.timeout = lambda : 0.00001    
 
         Ros.__init__(self, host=host_ip, port=9090)
-        self.run()
 
         # Communication control
         self.sequence_id = -1
 
         self.sent_messages_ack = {}
         self.trip_times = []
+        self.external_status_change_callback = status_change_callback
         
-        def callback(message_string):
+        def clamp_response_callback(message_string):
             receive_time = current_milli_time()
             # Retrive the sent message and compare time
             feedback_message = json.loads(message_string['data'])
@@ -66,7 +66,20 @@ class RemoteClampFunctionCall(Ros):
 
         # Setup listener to listen for feedback
         self.listener = roslibpy.Topic(self, '/clamp_response', 'std_msgs/String')
-        self.listener.subscribe(callback)
+        self.listener.subscribe(clamp_response_callback)
+
+        # Clamp_status are status messages published by the clamp controller.
+        # There is no need to repond to these messages. But perhaps need updating the model upstream.
+        # 
+        def status_callback(message):
+            command_dict = json.loads(message['data'])
+            # Relay message to callback
+            if self.external_status_change_callback is not None:
+                self.external_status_change_callback(command_dict)
+
+        # Setup listener topic.
+        self.listener = roslibpy.Topic(self, '/clamp_status', 'std_msgs/String')
+        self.listener.subscribe(status_callback)
 
         # Send an initial message Sequence id will be -1
         self.send_ros_command("ROS_NEW_SENDER_INITIALIZE", "")
@@ -127,7 +140,7 @@ if __name__ == "__main__":
 
     hostip = '192.168.0.117'
     clamps_connection = RemoteClampFunctionCall(hostip)
-
+    clamps_connection.run()
     # Command to send clamp to target (non-blocking)
     # clamps_connection.send_ROS_VEL_GOTO_COMMAND(100.0, 1.0)
 
