@@ -128,8 +128,9 @@ def create_ui_process(root, q: Queue):
     frame.pack(fill=tk.BOTH, expand=1, side=tk.TOP, padx=6, pady=3)
     tree = ttk.Treeview(frame, selectmode='browse')
 
-    tree["columns"] = ("description", "details", "traj_points", "speed_type", "speed")
+    tree["columns"] = ("movement_id", "description", "details", "traj_points", "speed_type", "speed")
     tree.column("#0", width=150, minwidth=20, stretch=tk.NO)
+    tree.column("movement_id", width=100, minwidth=30, stretch=tk.NO)
     tree.column("description", width=180, minwidth=30, stretch=tk.NO)
     tree.column("details", width=200, minwidth=30)
     tree.column("traj_points", width=100, minwidth=20, stretch=tk.NO)
@@ -137,6 +138,7 @@ def create_ui_process(root, q: Queue):
     tree.column("speed", width=40, minwidth=20, stretch=tk.NO)
 
     tree.heading("#0", text="Name", anchor=tk.W)
+    tree.heading("movement_id", text="movement_id", anchor=tk.W)
     tree.heading("description", text="Description", anchor=tk.W)
     tree.heading("details", text="Details", anchor=tk.W)
     tree.heading("traj_points", text="TrajectoryPoints", anchor=tk.W)
@@ -168,19 +170,21 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
                 parent="", index="end", iid=action.beam_id, text="Beam %s" % action.beam_id, open=True)
             guiref['process']['item_ids'].append(action.beam_id)
         # Action Row
-        action_item = tree.insert(parent=beam_item, index="end", iid=action.action_id, text="Action %i" % i,
-                                  values=(action.__class__.__name__, "%s" % action, ""), open=True)
+        description = action.__class__.__name__
+        action_item = tree.insert(parent=beam_item, index="end", iid=action.action_id, text="Action %i" % action.act_n,
+                                  values=("", description, "%s" % action, ""), open=True)
         guiref['process']['item_ids'].append(action.action_id)
 
         # Movement Rows
         for j, movement in enumerate(action.movements):
+            movement_id = movement.movement_id
             description = movement.__class__.__name__
             details =  "%s" % movement
             traj_points = ""
             speed_type = movement.speed_type if hasattr(movement, 'speed_type') else ""
             speed = model.settings[speed_type] if hasattr(movement, 'speed_type') else ""
             movement_item = tree.insert(parent=action_item, index="end", iid=movement.move_id, text="Movement %i" % j,
-                                        values=(description, details, traj_points, speed_type, speed))
+                                        values=(movement_id, description, details, traj_points, speed_type, speed))
             guiref['process']['item_ids'].append(movement.move_id)
             tree.see(movement_item)
             if tree.selection() == ():
