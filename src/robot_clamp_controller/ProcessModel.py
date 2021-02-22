@@ -159,7 +159,7 @@ class RobotClampExecutionModel(object):
         Returns True on successful connection"""
 
         # Disconnect from previous host
-        if (self.ros_robot is not None) and (self.ros_robot.is_connected):
+        if (self.ros_robot is not None) and (self.ros_robot.ros.is_connected):
             try:
                 self.ros_robot.close()
                 logger_model.info("Previous ABB Robot ROS host disconnected")

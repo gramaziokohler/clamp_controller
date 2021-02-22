@@ -154,9 +154,7 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     "Relaying BackgroundCommand: UI_GOTO_START_FRAME.")
                 if model.process is None:
                     logger_bg.info("Load Process first.")
-                if (model.ros_robot is None) or (not model.ros_robot.is_connected):
-                    logger_bg.info("Connect ROS Robot first.")
-                if (model.ros_robot is None) or (not model.ros_robot.is_connected):
+                if (model.ros_robot is None) or (not model.ros_robot.ros.is_connected):
                     logger_bg.info("Connect ROS Robot first.")
                 if model.run_status != RunStatus.STOPPED:
                     logger_bg.info("Run Status is not stopped: %s. Stop it first." % model.run_status)
@@ -176,12 +174,12 @@ def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
 
     movement = model.movements[move_id] # type: Movement
 
-    if hasattr(movement, 'target_frame'):
+    if not hasattr(movement, 'target_frame'):
         logger_run.info("Selected movement does not have end frame.")
         return False
 
     robot_goto_frame(model, movement.target_frame, 300)
-
+    return True
 
 
 def wait_for_opeartor_confirm(guiref, model:RobotClampExecutionModel, message : str = "Confirm"):
@@ -245,7 +243,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
 
         # Terminate if execution is not success, do not increment pointer.
         if not success:
-            model.run_status == RunStatus.ERROR
+            model.run_status = RunStatus.ERROR
             logger_run.info("Execution Error. Program Stopped. Run Thread Ended.")
             q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
             break

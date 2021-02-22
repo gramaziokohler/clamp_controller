@@ -8,6 +8,7 @@ from compas_fab.robots import to_degrees
 
 logger_exe = logging.getLogger("app.exe")
 
+current_milli_time = lambda: int(round(time.time() * 1000))
 
 def execute_movement(model: RobotClampExecutionModel, movement: Movement):
     """Return True if the movement is executed to completion without problem.
@@ -107,8 +108,24 @@ def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: R
     return True
 
 def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: ClampsJawMovement):
-    # model.ros_clamps.send_ROS_VEL_GOTO_COMMAND_wait()
-    return True
+    if (model.ros_clamps is None) or not model.ros_clamps.is_connected:
+        logger_exe.info("Clamp movement cannot start because Clamp ROS is not connected")
+        return False
+    # Remove clamp prefix:
+    clamp_ids = [clamp_id[1:] for clamp_id in  movement.clamp_ids]
+    velocity = model.settings[movement.speed_type]
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, movement.jaw_positions[0], velocity)
+    logger_exe.info("Clamp Jaw Movement Started: %s, seq_id = %s" % (movement, sequence_id))
+    while (True):
+        if model.ros_clamps.sent_messages_ack[sequence_id] == True:
+            logger_exe.info("Clamp Jaw Movement completed")
+            return True
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn(
+                "Movement execution Stopped before sequence_id (%s) is confirmed." % sequence_id)
+            model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
+            return False
+
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
