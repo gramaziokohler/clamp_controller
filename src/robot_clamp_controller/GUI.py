@@ -44,23 +44,47 @@ def create_ui_ros(root, q: Queue):
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
     # Button Handle
-    def on_ros_connect_button_click(event=None):
-        logger_ui.info("Button Pressed: Connect to ROS")
-        ip = ros_ip_entrybox.get()
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_ROS_CONNECT, ip=ip))
+    def on_robot_ros_connect_button_click(event=None):
+        logger_ui.info("Button Pressed: Connect to Robot ROS Host")
+        ip = robot_ip_entrybox.get()
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_ROBOT_CONNECT, ip=ip))
 
-    tk.Label(frame, text="ROS Core IP Address: ", font=tk.font_key,
+    tk.Label(frame, text="ROS Robot Host IP Address: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    ui_handles['ros_ip_entry'] = tk.StringVar(value="127.0.0.0")
-    ros_ip_entrybox = tk.Entry(frame, textvariable=ui_handles['ros_ip_entry'])
-    ros_ip_entrybox.pack(side=tk.LEFT)
+    ui_handles['robot_ip_entry'] = tk.StringVar(value="127.0.0.0")
+    robot_ip_entrybox = tk.Entry(frame, textvariable=ui_handles['robot_ip_entry'])
+    robot_ip_entrybox.pack(side=tk.LEFT)
     tk.Button(frame, text="Connect",
-              command=on_ros_connect_button_click).pack(side=tk.LEFT)
+              command=on_robot_ros_connect_button_click).pack(side=tk.LEFT)
     # Status Label
     tk.Label(frame, text="Status: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    ui_handles['ros_status'] = tk.StringVar(value="Not Connected")
-    tk.Label(frame, textvariable=ui_handles['ros_status'], font=tk.font_key, anchor=tk.SE).pack(
+    ui_handles['robot_status'] = tk.StringVar(value="Not Connected")
+    tk.Label(frame, textvariable=ui_handles['robot_status'], font=tk.font_key, anchor=tk.SE).pack(
+        side=tk.LEFT, fill=tk.Y, padx=10)
+
+    # Clamp Connections
+    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    # Button Handle
+    def on_clamp_ros_connect_button_click(event=None):
+        logger_ui.info("Button Pressed: Connect to Clamps ROS Host")
+        ip = clamp_ip_entrybox.get()
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_CLAMP_CONNECT, ip=ip))
+
+    tk.Label(frame, text="ROS Clamp Host IP Address: ", font=tk.font_key,
+             anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    ui_handles['clamp_ip_entry'] = tk.StringVar(value="127.0.0.0")
+    clamp_ip_entrybox = tk.Entry(frame, textvariable=ui_handles['clamp_ip_entry'])
+    clamp_ip_entrybox.pack(side=tk.LEFT)
+    tk.Button(frame, text="Connect",
+              command=on_clamp_ros_connect_button_click).pack(side=tk.LEFT)
+    # Status Label
+    tk.Label(frame, text="Status: ", font=tk.font_key,
+             anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    ui_handles['clamp_status'] = tk.StringVar(value="Not Connected")
+    tk.Label(frame, textvariable=ui_handles['clamp_status'], font=tk.font_key, anchor=tk.SE).pack(
         side=tk.LEFT, fill=tk.Y, padx=10)
 
     return ui_handles
@@ -170,7 +194,6 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     logger_ui.info("Actions Treeview Updated")
     
 
-
 def treeview_get_selected_id(guiref):
     """Returns the currently selected id.
     Beaware it may not be a movement."""
@@ -243,9 +266,6 @@ def create_ui_execution(root, q: Queue):
     tk.Label(middle_frame, textvariable=ui_handles['exe_status'], font=tk.big_status_font, anchor=tk.CENTER, height=2).pack(
         side=tk.TOP, fill=tk.BOTH, padx=10)
 
-    right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
-    right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
-
     def on_confirm_button_click(event=None):
         logger_ui.info("Button Pressed: Confirm")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_CONFIRM))
@@ -255,6 +275,16 @@ def create_ui_execution(root, q: Queue):
     ui_handles['confirm_button'] = confirm_button = tk.Button(middle_frame, textvariable=ui_handles['confirm_button_text'],
                                                               command=on_confirm_button_click, font=tk.big_button_font, width=20, height=2, state="disabled", bg='grey')
     ui_handles['confirm_button'].pack(side=tk.BOTTOM)
+
+    right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
+
+    def on_goto_end_button_click(event=None):
+        logger_ui.info("Button Pressed: GOTO END FRAME")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_FRAME))
+    ui_handles['goto_end_button'] = tk.Button(
+        right_frame, text="GOTO START FRAME", command=on_goto_end_button_click, font=tk.big_button_font, width=20)
+    ui_handles['goto_end_button'].pack(side=tk.TOP)
 
     return ui_handles
 

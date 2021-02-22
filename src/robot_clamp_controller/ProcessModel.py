@@ -114,22 +114,24 @@ class RobotClampExecutionModel(object):
                 movement.move_id = move_id
                 self.movements[move_id] = movement
 
+
+    def ros_clamps_callback(message, q=None):
+        # ROS command comes from a separate thread.
+        # To maintain single threaded access to the Radio / Clamp,
+        # we convert the ROS Command to a BackgroundCommand and place it in background command queue
+
+        message_type = message['instruction_type']
+
+        logger_ros.info("Ros Message Received: %s" % message)
+        if message_type == "CLAMPS_JAMMED":
+            sequence_id = message['sequence_id']
+            instructions = message['instruction_body']
+            q.put(SimpleNamespace(type=BackgroundCommand.EXE_CLAMPS_JAMMED,
+                                    clmap_pos_velo=instructions, sequence_id=sequence_id))
+
     def connect_ros_clamps(self, ip, q):
         """Function to connect to ROS CLamps Client.
         Returns True on successful connection"""
-        def ros_clamps_callback(message, q=None):
-            # ROS command comes from a separate thread.
-            # To maintain single threaded access to the Radio / Clamp,
-            # we convert the ROS Command to a BackgroundCommand and place it in background command queue
-
-            message_type = message['instruction_type']
-
-            logger_ros.info("Ros Message Received: %s" % message)
-            if message_type == "CLAMPS_JAMMED":
-                sequence_id = message['sequence_id']
-                instructions = message['instruction_body']
-                q.put(SimpleNamespace(type=BackgroundCommand.EXE_CLAMPS_JAMMED,
-                                      clmap_pos_velo=instructions, sequence_id=sequence_id))
 
         # Disconnect from previous host
         if (self.ros_clamps is not None) and (self.ros_clamps.is_connected):
@@ -140,7 +142,7 @@ class RobotClampExecutionModel(object):
                 pass
 
         self.ros_clamps = RemoteClampFunctionCall(
-            ip, status_change_callback=partial(ros_clamps_callback, q=q))
+            ip, status_change_callback=partial(self.ros_clamps_callback, q=q))
         try:
             # This runs in a separate thread
             self.ros_clamps.run(timeout=2)

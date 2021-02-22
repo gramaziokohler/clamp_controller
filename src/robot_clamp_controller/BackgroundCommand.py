@@ -1,11 +1,15 @@
-from enum import Enum
+from enum import Enum, auto
 
 class BackgroundCommand(Enum):
-    UI_ROS_CONNECT = 0
-    UI_RUN = 1
-    UI_STEP = 2
-    UI_STOP = 3
-    UI_CONFIRM = 4
-    UI_UPDATE_STATUS = 5
-    MODEL_LOAD_PROCESS = 10
-    EXE_CLAMPS_JAMMED = 11
+    UI_ROBOT_CONNECT = auto()
+    UI_CLAMP_CONNECT = auto()
+    
+    UI_RUN = auto()
+    UI_STEP = auto()
+    UI_STOP = auto()
+    UI_CONFIRM = auto()
+    UI_UPDATE_STATUS = auto()
+    UI_GOTO_END_FRAME = auto()
+
+    MODEL_LOAD_PROCESS = auto()
+    EXE_CLAMPS_JAMMED = auto()

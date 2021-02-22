@@ -110,7 +110,6 @@ def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: Clamps
     # model.ros_clamps.send_ROS_VEL_GOTO_COMMAND_wait()
     return True
 
-
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
         time.sleep(0.3)
@@ -119,6 +118,9 @@ def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
                 "Movement execution Stopped before completion (future not arrived): %s" % movement)
             return False
     return True
+
+def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
+    model.ros_robot.send_and_wait(rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
 
 ##################
 # Helper Functions

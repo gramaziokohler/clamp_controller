@@ -15,7 +15,7 @@ from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.GUI import *
 from robot_clamp_controller.ProcessModel import RobotClampExecutionModel, RunStatus
-from robot_clamp_controller.Execute import execute_movement
+from robot_clamp_controller.Execute import execute_movement, robot_goto_frame
 import argparse
 
 
@@ -119,23 +119,69 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 model.operator_confirm = True
                 ui_update_run_status(guiref, model)
 
-            # Handelling UI_ROS_CONNECT
-            if msg.type == BackgroundCommand.UI_ROS_CONNECT:
+            # Handelling UI_ROBOT_CONNECT
+            if msg.type == BackgroundCommand.UI_ROBOT_CONNECT:
                 logger_bg.info(
                     "Relaying BackgroundCommand: UI_ROS_CONNECT - msg.ip = %s" % msg.ip)
 
                 # Connect to new ROS host
-                guiref['ros']['ros_status'].set("Connecting to ROS")
-                if model.connect_ros_clamps(msg.ip, q):
-                    guiref['ros']['ros_status'].set("Connected to ROS")
-                    logger_ctr.info("Ros Connected")
+                guiref['ros']['robot_status'].set("Connecting to Robot Host")
+                if model.connect_ros_robots(msg.ip, q):
+                    guiref['ros']['robot_status'].set("Connected to Robot Host")
+                    logger_ctr.info("Robot Host Connected")
                 else:
-                    guiref['ros']['ros_status'].set("Not Connected")
+                    guiref['ros']['robot_status'].set("Not Connected")
+                    logger_ctr.info("Robot Host connection not successful")
 
+            # Handelling UI_CLAMP_CONNECT
+            if msg.type == BackgroundCommand.UI_CLAMP_CONNECT:
+                logger_bg.info(
+                    "Relaying BackgroundCommand: UI_CLAMP_CONNECT - msg.ip = %s" % msg.ip)
+
+                # Connect to new ROS host
+                guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
+                if model.connect_ros_clamps(msg.ip, q):
+                    guiref['ros']['clamp_status'].set("Connected to Clamp Hose")
+                    logger_ctr.info("Clamp Host Connected")
+                else:
+                    guiref['ros']['clamp_status'].set("Not Connected")
+                    logger_ctr.info("Clamp Host connection not successful")
+            
+
+            # Handelling UI_RUN
+            if msg.type == BackgroundCommand.UI_GOTO_END_FRAME:
+                logger_bg.info(
+                    "Relaying BackgroundCommand: UI_GOTO_START_FRAME.")
+                if model.process is None:
+                    logger_bg.info("Load Process first.")
+                if (model.ros_robot is None) or (not model.ros_robot.is_connected):
+                    logger_bg.info("Connect ROS Robot first.")
+                if (model.ros_robot is None) or (not model.ros_robot.is_connected):
+                    logger_bg.info("Connect ROS Robot first.")
+                if model.run_status != RunStatus.STOPPED:
+                    logger_bg.info("Run Status is not stopped: %s. Stop it first." % model.run_status)
+                else:
+                    robot_goto_end_frame(guiref, model, q)
 
             return True
     except queue.Empty:
         return False
+
+def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
+    # Run the Selected Item. If it is not a Movement, do nothing
+    move_id = treeview_get_selected_id(guiref)
+    if not move_id.startswith('m'):
+        logger_run.info("Selected item is not a movement")
+        return False
+
+    movement = model.movements[move_id] # type: Movement
+
+    if hasattr(movement, 'target_frame'):
+        logger_run.info("Selected movement does not have end frame.")
+        return False
+
+    robot_goto_frame(model, movement.target_frame, 300)
+
 
 
 def wait_for_opeartor_confirm(guiref, model:RobotClampExecutionModel, message : str = "Confirm"):
@@ -246,7 +292,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='CLI RobotClampExecution.')
     parser.add_argument('-f', default='',  help='Load Process File on Start')
-    parser.add_argument('-rosip', default='192.168.0.117',  help='Load Process File on Start')
+    parser.add_argument('-robotip', default='192.168.0.117',  help='IP for Robot ROS Host')
+    parser.add_argument('-clampip', default='192.168.0.117',  help='IP for Clamp ROS Host')
     args = parser.parse_args()
     print(args)
     # Initialize Logger
@@ -271,8 +318,8 @@ if __name__ == "__main__":
     t1.start()
 
     # Override default ip
-    guiref['ros']['ros_ip_entry'].set(args.rosip)  # VM Address
-    # guiref['ros']['ros_ip_entry'].set('192.168.0.117') # RFL Address
+    guiref['ros']['robot_ip_entry'].set(args.robotip)  # VM Address
+    guiref['ros']['clamp_ip_entry'].set(args.clampip)  # VM Address
 
     if not args.f == "":
         logger_ctr.info(
@@ -285,4 +332,4 @@ if __name__ == "__main__":
 
 
 # Development command line start with sample file opened:
-# python C:\Users\leungp\Documents\GitHub\clamp_controller\src\robot_clamp_controller\run.py -f C:\Users\leungp\Documents\GitHub\itj_design_study\210128_RemodelFredPavilion\twelve_pieces_process.json -rosip 192.168.20.128
+# python C:\Users\leungp\Documents\GitHub\clamp_controller\src\robot_clamp_controller\run.py -f C:\Users\leungp\Documents\GitHub\itj_design_study\210128_RemodelFredPavilion\twelve_pieces_process.json -robotip 192.168.20.128
