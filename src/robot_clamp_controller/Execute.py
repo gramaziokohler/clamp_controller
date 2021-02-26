@@ -88,20 +88,24 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
     # while(True):
     #     # Check if previously sent points (futures) is completed
     #     # Send points if the difference in two points are =< 1 and if we have more points left
-    #  
+    #
     #     pass
     return True
 
 def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
 
+    if movement.trajectory is None:
+        logger_exe.warn("Attempt to execute movement with no trajectory")
+        return False
+
     for n, point in enumerate(movement.trajectory.points):
-        assert len(point.values) == 8
+        print(point)
+        assert len(point.values) == 9
         ext_values = to_millimeters(point.values[0:3])
         joint_values = to_degrees(point.values[3:10])
         zone = rrc.Zone.Z1
         speed = model.settings[movement.speed_type]
         model.ros_robot.send(rrc.MoveToJoints(model.joint_offset(joint_values), ext_values, speed, zone))
-
     return True
 
 def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: RoboticLinearMovement):

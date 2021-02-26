@@ -39,6 +39,7 @@ class RobotClampExecutionModel(object):
 
     def __init__(self):
         self.process: RobotClampAssemblyProcess = None
+        self.process_path = ""
 
         # Ordered Dict for easy accessing the movements via move_id
         self.movements = OrderedDict()
@@ -101,9 +102,12 @@ class RobotClampExecutionModel(object):
             logger_model.info("Settings saved to %s." % path)
 
     def load_process(self, json_path):
+        """Load the Process object from json file, adds a tree_row_id into each action and movement."""
+
         with open(json_path, 'r') as f:
             self.process = json.load(f, cls=DataDecoder)
         logger_model.info("load_process(): %s" % self.process_description)
+        self.process_path = json_path
 
         # Organize movements into an OrderedDict collection for easier manupulation
         self.movements = OrderedDict()  # type : OrderedDict(Movement)
@@ -112,6 +116,21 @@ class RobotClampExecutionModel(object):
             for move_n, movement in enumerate(action.movements):
                 movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
                 self.movements[movement.tree_row_id] = movement
+
+    def load_external_movements(self):
+        # type: () -> list(Movement)
+        """Load External Movements, returns all the movements modified"""
+        process_folder = os.path.dirname(self.process_path)
+        movements_modified = []
+        for movement in self.process.movements:
+            movement_path = os.path.join(process_folder, movement.filepath)
+            if os.path.exists(movement_path):
+                print("Loading External Movement File: movement_path%s" %
+                      movement_path)
+                with open(movement_path, 'r') as f:
+                    movement.data = json.load(f, cls=DataDecoder).data
+                movements_modified.append(movement)
+        return movements_modified
 
     def ros_clamps_callback(message, q=None):
         # ROS command comes from a separate thread.

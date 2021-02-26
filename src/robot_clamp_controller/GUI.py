@@ -116,15 +116,22 @@ def create_ui_process(root, q: Queue):
             q.put(SimpleNamespace(
                 type=BackgroundCommand.MODEL_LOAD_PROCESS, json_path=filename))
 
+    def on_load_ext_movement_button_click(event=None):
+        logger_ui.info("Button Pressed: Confirm")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_LOAD_EXT_MOVEMENT))
+
     tk.Label(frame, text="Process JSON: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     # Status Label
     ui_handles['process_status'] = tk.StringVar(value="Not Loaded")
     tk.Label(frame, textvariable=ui_handles['process_status'], font=tk.font_key, anchor=tk.SE).pack(
         side=tk.LEFT, fill=tk.Y, padx=10)
-    # Load Button
+    # Load Process Button
     tk.Button(frame, text="Load Json File.",
               command=on_load_process_button_click).pack(side=tk.LEFT)
+    # Load External Movement Button
+    tk.Button(frame, text="Reload External Json",
+              command=on_load_ext_movement_button_click).pack(side=tk.LEFT)
 
     # Second Frame holds the treeview for process Movements and Actions List
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
@@ -218,6 +225,32 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     guiref['exe']['step_button'].config(state="normal")
     guiref['exe']['stop_button'].config(state="normal")
     logger_ui.info("Actions Treeview Updated")
+
+
+def update_treeview_row(guiref, model, movement):
+    # type: (dict, RobotClampExecutionModel, Movement) -> None
+    tree = guiref['process']['tree']  # type: ttk.Treeview
+    tree_row_id = movement.tree_row_id
+    row = tree.item(tree_row_id)
+    values = row['values']
+    print (row['values'])
+    # Generate trajectory description:
+    if isinstance(movement, RoboticMovement):
+        if movement.trajectory is None:
+            traj_description = "Missing"
+        else:
+            traj_description = "%i Points" % len(movement.trajectory.points)
+    else:
+        traj_description = "- nil -"
+
+    values[0] = movement.movement_id           # movement_id
+    values[1] = movement.__class__.__name__    # description
+    values[2] = "%s" % movement                #details
+    values[3] = traj_description
+    values[4] = movement.speed_type if hasattr(movement, 'speed_type') else ""
+    values[5] = model.settings[movement.speed_type] if hasattr(movement, 'speed_type') else ""
+    tree.item(tree_row_id, values = values)
+
 
 
 def treeview_get_selected_id(guiref):

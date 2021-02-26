@@ -10,6 +10,8 @@ class BackgroundCommand(Enum):
     UI_CONFIRM = auto()
     UI_UPDATE_STATUS = auto()
     UI_GOTO_END_FRAME = auto()
+    UI_LOAD_EXT_MOVEMENT = auto()
+
     PRINT_ACTION_SUMMARY = auto()
     MODEL_LOAD_PROCESS = auto()
     EXE_CLAMPS_JAMMED = auto()

@@ -159,6 +159,16 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 if beam_id is not None:
                     model.process.get_movement_summary_by_beam_id(beam_id)
 
+            # Handelling UI_LOAD_EXT_MOVEMENT
+            if msg.type == BackgroundCommand.UI_LOAD_EXT_MOVEMENT:
+                logger_bg.info(
+                    "Relaying BackgroundCommand: UI_LOAD_EXT_MOVEMENT.")
+                if model.process is None:
+                    logger_bg.info("Load Process first.")
+                movements_modified = model.load_external_movements()
+                for movement in movements_modified:
+                    update_treeview_row(guiref, model, movement)
+
             # Handelling UI_RUN
             if msg.type == BackgroundCommand.UI_GOTO_END_FRAME:
                 logger_bg.info(
