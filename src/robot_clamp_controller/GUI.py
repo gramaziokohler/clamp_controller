@@ -19,6 +19,7 @@ def create_execution_gui(root, q):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)
     tk.font_value = tkFont.Font(family="Lucida Console", size=20)
     tk.big_button_font = tkFont.Font(family="Lucida Console", size=15)
+    tk.small_button_font = tkFont.Font(family="Lucida Console", size=8)
     tk.big_status_font = tkFont.Font(
         family="Lucida Console", size=25, weight='bold')
 
@@ -52,7 +53,8 @@ def create_ui_ros(root, q: Queue):
     tk.Label(frame, text="ROS Robot Host IP Address: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     ui_handles['robot_ip_entry'] = tk.StringVar(value="127.0.0.0")
-    robot_ip_entrybox = tk.Entry(frame, textvariable=ui_handles['robot_ip_entry'])
+    robot_ip_entrybox = tk.Entry(
+        frame, textvariable=ui_handles['robot_ip_entry'])
     robot_ip_entrybox.pack(side=tk.LEFT)
     tk.Button(frame, text="Connect",
               command=on_robot_ros_connect_button_click).pack(side=tk.LEFT)
@@ -76,7 +78,8 @@ def create_ui_ros(root, q: Queue):
     tk.Label(frame, text="ROS Clamp Host IP Address: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     ui_handles['clamp_ip_entry'] = tk.StringVar(value="127.0.0.0")
-    clamp_ip_entrybox = tk.Entry(frame, textvariable=ui_handles['clamp_ip_entry'])
+    clamp_ip_entrybox = tk.Entry(
+        frame, textvariable=ui_handles['clamp_ip_entry'])
     clamp_ip_entrybox.pack(side=tk.LEFT)
     tk.Button(frame, text="Connect",
               command=on_clamp_ros_connect_button_click).pack(side=tk.LEFT)
@@ -128,7 +131,11 @@ def create_ui_process(root, q: Queue):
     frame.pack(fill=tk.BOTH, expand=1, side=tk.TOP, padx=6, pady=3)
     tree = ttk.Treeview(frame, selectmode='browse')
 
-    tree["columns"] = ("movement_id", "description", "details", "traj_points", "speed_type", "speed")
+    tree["columns"] = ("movement_id", "description", "details",
+                       "traj_points", "speed_type", "speed", 'beam_id')
+    tree["displaycolumns"] = (
+        "movement_id", "description", "details", "traj_points", "speed_type", "speed")
+
     tree.column("#0", width=150, minwidth=20, stretch=tk.NO)
     tree.column("movement_id", width=100, minwidth=30, stretch=tk.NO)
     tree.column("description", width=180, minwidth=30, stretch=tk.NO)
@@ -144,6 +151,7 @@ def create_ui_process(root, q: Queue):
     tree.heading("traj_points", text="TrajectoryPoints", anchor=tk.W)
     tree.heading("speed_type", text="Speed Type", anchor=tk.W)
     tree.heading("speed", text="mm/s", anchor=tk.W)
+    tree.heading("beam_id", text="beam_id", anchor=tk.W)
 
     tree.pack(fill=tk.BOTH, expand=1, padx=6, pady=3, side=tk.LEFT)
 
@@ -158,35 +166,49 @@ def create_ui_process(root, q: Queue):
 
 
 def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
-    """ Initialize the actions treeview after laoding process"""
+    """ Initialize the actions treeview after laoding process
+
+    The dictionary guiref['process']['item_ids'] holds a list of
+    ttk TreeView iid values equal to each row's iid.
+
+    - Beams : 'b_%i' = beam_id
+    - Acion : 'a_%i' % action.act_n
+    - Movement: "m%i_%i" % (action.act_n, move_n)
+    """
     tree = guiref['process']['tree']  # type: ttk.Treeview
     process = model.process
     beam_item = None
+    beam_id = ""
     guiref['process']['item_ids'] = []  # type : List[str]
+
     for i, action in enumerate(process.actions):
         # Beam Row
         if isinstance(action, LoadBeamAction):
+            beam_id = action.beam_id
             beam_item = tree.insert(
-                parent="", index="end", iid=action.beam_id, text="Beam %s" % action.beam_id, open=True)
+                parent="", index="end", iid=beam_id, text="Beam %s" % action.beam_id, open=True,
+                values=("", "", "", "", "", "", beam_id))
             guiref['process']['item_ids'].append(action.beam_id)
         # Action Row
         description = action.__class__.__name__
-        action_item = tree.insert(parent=beam_item, index="end", iid=action.action_id, text="Action %i" % action.act_n,
-                                  values=("", description, "%s" % action, ""), open=True)
-        guiref['process']['item_ids'].append(action.action_id)
+        action_item = tree.insert(parent=beam_item, index="end", iid=action.tree_row_id, text="Action %i" % action.act_n,
+                                  values=("", description, "%s" % action, "", "", "", beam_id), open=True)
+        guiref['process']['item_ids'].append(action.tree_row_id)
 
         # Movement Rows
         for j, movement in enumerate(action.movements):
             movement_id = movement.movement_id
             description = movement.__class__.__name__
-            details =  "%s" % movement
+            details = "%s" % movement
             traj_points = ""
-            speed_type = movement.speed_type if hasattr(movement, 'speed_type') else ""
-            speed = model.settings[speed_type] if hasattr(movement, 'speed_type') else ""
-            movement_item = tree.insert(parent=action_item, index="end", iid=movement.move_id, text="Movement %i" % j,
-                                        values=(movement_id, description, details, traj_points, speed_type, speed))
-            guiref['process']['item_ids'].append(movement.move_id)
-            tree.see(movement_item)
+            speed_type = movement.speed_type if hasattr(
+                movement, 'speed_type') else ""
+            speed = model.settings[speed_type] if hasattr(
+                movement, 'speed_type') else ""
+            movement_item = tree.insert(parent=action_item, index="end", iid=movement.tree_row_id, text="Movement %i" % j,
+                                        values=(movement_id, description, details, traj_points, speed_type, speed, beam_id))
+            guiref['process']['item_ids'].append(movement.tree_row_id)
+            # tree.see(movement_item)
             if tree.selection() == ():
                 tree.selection_set(movement_item)
 
@@ -196,17 +218,39 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     guiref['exe']['step_button'].config(state="normal")
     guiref['exe']['stop_button'].config(state="normal")
     logger_ui.info("Actions Treeview Updated")
-    
+
 
 def treeview_get_selected_id(guiref):
-    """Returns the currently selected id.
+    # type: (dict) -> str
+    """Returns the currently selected item's iid.
+    In the format of "m%i_%i" % (act_n, mov_n)
+
     Beaware it may not be a movement."""
     tree = guiref['process']['tree']  # type: ttk.Treeview
-    move_id = tree.selection()[0]
-    return move_id
+    tree_row_id = tree.selection()[0]
+    return tree_row_id
+
+
+def treeview_get_selected_item_beam_id(guiref):
+    # type: (dict) -> str
+    """Returns the currently selected item's associated beam_id
+    """
+    tree = guiref['process']['tree']  # type: ttk.Treeview
+    try:
+        tree_row_id = tree.selection()[0]
+    except:
+        return None
+    row = tree.item(tree_row_id)
+    column_id = tree["columns"].index('beam_id')
+    # Example print(row)
+    # {'text': 'Beam b0', 'image': '', 'values': ['', '', '', '', '', '', 'b0'], 'open': 1, 'tags': ''}
+    # {'text': 'Action 0', 'image': '', 'values': ['', 'LoadBeamAction', "Operator load Beam ('b0') for pickup", '', '', '', 'b0'], 'open': 1, 'tags': ''}
+    # {'text': 'Movement 0', 'image': '', 'values': ['A0_M0', 'OperatorLoadBeamMovement', "Load Beam ('b0') for pickup at Frame(Point(22875.898, 5076.094, 620.825), Vector(0.000, 1.000, 0.000), Vector(-1.000, 0.000, 0.000)) (Side 3 face up).", '', '', '', 'b0'], 'open': 0, 'tags': ''}
+    return row['values'][column_id]
 
 
 def treeview_select_next_movement(guiref):
+    # type: (dict) -> str
     """Select the next available movement"""
 
     tree = guiref['process']['tree']  # type: ttk.Treeview
@@ -287,8 +331,14 @@ def create_ui_execution(root, q: Queue):
         logger_ui.info("Button Pressed: GOTO END FRAME")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_FRAME))
     ui_handles['goto_end_button'] = tk.Button(
-        right_frame, text="GOTO START FRAME", command=on_goto_end_button_click, font=tk.big_button_font, width=20)
-    ui_handles['goto_end_button'].pack(side=tk.TOP)
+        right_frame, text="GOTO End Frame", command=on_goto_end_button_click, font=tk.big_button_font, width=20)
+    ui_handles['goto_end_button'].pack(fill=tk.X, side=tk.TOP)
+
+    def on_print_summary_button_click(event=None):
+        logger_ui.info("Button Pressed: Print Selected Beam Action Summary")
+        q.put(SimpleNamespace(type=BackgroundCommand.PRINT_ACTION_SUMMARY))
+    tk.Button(right_frame, text="Print Selected Beam Action Summary",
+              command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     return ui_handles
 

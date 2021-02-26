@@ -13,7 +13,7 @@ from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from compas.utilities import DataDecoder
 from compas_fab.backends.ros import RosClient
 from compas_rrc import AbbClient
-from integral_timber_joints.process import (Action, Movement,
+from integral_timber_joints.process import (Action, Movement, LoadBeamAction,
                                             RobotClampAssemblyProcess)
 
 from robot_clamp_controller.BackgroundCommand import *
@@ -82,11 +82,11 @@ class RobotClampExecutionModel(object):
             'speed.toolchange.retract.clamp_on_structure': 5,
             'speed.assembly.inclamp': 50,   # Sliding beam into clamp.
             'speed.assembly.noclamp': 20,   # Simply putting it down
-            'speed.assembly.clamping': 20,  # 
-            'speed.gripper.approach': 50, # Approaching Pickup Station
+            'speed.assembly.clamping': 20,  #
+            'speed.gripper.approach': 50,  # Approaching Pickup Station
             'speed.gripper.retract': 50,    # Retract after placing
             'speed.clamp.rapid': 5,
-            'robot.joint_offset' : [0,0,0,0,0,0]
+            'robot.joint_offset': [0, 0, 0, 0, 0, 0]
         }
 
         # Load Previously saved settings if exist
@@ -108,12 +108,10 @@ class RobotClampExecutionModel(object):
         # Organize movements into an OrderedDict collection for easier manupulation
         self.movements = OrderedDict()  # type : OrderedDict(Movement)
         for i, action in enumerate(self.process.actions):
-            action.action_id = 'a_%i' % i
-            for j, movement in enumerate(action.movements):
-                move_id = "m%i_%i" % (i, j)
-                movement.move_id = move_id
-                self.movements[move_id] = movement
-
+            action.tree_row_id = 'a_%i' % action.act_n
+            for move_n, movement in enumerate(action.movements):
+                movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
+                self.movements[movement.tree_row_id] = movement
 
     def ros_clamps_callback(message, q=None):
         # ROS command comes from a separate thread.
@@ -127,7 +125,7 @@ class RobotClampExecutionModel(object):
             sequence_id = message['sequence_id']
             instructions = message['instruction_body']
             q.put(SimpleNamespace(type=BackgroundCommand.EXE_CLAMPS_JAMMED,
-                                    clmap_pos_velo=instructions, sequence_id=sequence_id))
+                                  clmap_pos_velo=instructions, sequence_id=sequence_id))
 
     def connect_ros_clamps(self, ip, q):
         """Function to connect to ROS CLamps Client.

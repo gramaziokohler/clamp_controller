@@ -70,7 +70,7 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     guiref['process']['process_status'].set(
                         model.process_description)
                 init_actions_tree_view(guiref, model)
-            
+
             # Handle UI_UPDATE_STATUS
             if msg.type == BackgroundCommand.UI_UPDATE_STATUS:
                 logger_bg.info(
@@ -85,7 +85,8 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_bg.info("Load Process first")
                 elif not model.run_status == RunStatus.RUNNING:
                     model.run_status = RunStatus.RUNNING
-                    model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread = Thread(
+                        target=program_run_thread, args=(guiref, model, q), daemon=True)
                     model.run_thread.start()
                     ui_update_run_status(guiref, model)
                 # Dont do anyhting if program is already running
@@ -101,7 +102,8 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     model.run_status = RunStatus.STEPPING_FORWARD
                     # Start a new thread if the current one is not active
                     if model.run_thread is None or not model.run_thread.isAlive():
-                        model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                        model.run_thread = Thread(
+                            target=program_run_thread, args=(guiref, model, q), daemon=True)
                         model.run_thread.start()
                     ui_update_run_status(guiref, model)
 
@@ -127,7 +129,8 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Connect to new ROS host
                 guiref['ros']['robot_status'].set("Connecting to Robot Host")
                 if model.connect_ros_robots(msg.ip, q):
-                    guiref['ros']['robot_status'].set("Connected to Robot Host")
+                    guiref['ros']['robot_status'].set(
+                        "Connected to Robot Host")
                     logger_ctr.info("Robot Host Connected")
                 else:
                     guiref['ros']['robot_status'].set("Not Connected")
@@ -141,12 +144,20 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Connect to new ROS host
                 guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
                 if model.connect_ros_clamps(msg.ip, q):
-                    guiref['ros']['clamp_status'].set("Connected to Clamp Hose")
+                    guiref['ros']['clamp_status'].set(
+                        "Connected to Clamp Hose")
                     logger_ctr.info("Clamp Host Connected")
                 else:
                     guiref['ros']['clamp_status'].set("Not Connected")
                     logger_ctr.info("Clamp Host connection not successful")
-            
+
+            # Handelling PRINT_ACTION_SUMMARY
+            if msg.type == BackgroundCommand.PRINT_ACTION_SUMMARY:
+                logger_bg.info(
+                    "Relaying BackgroundCommand: PRINT_ACTION_SUMMARY.")
+                beam_id = treeview_get_selected_item_beam_id(guiref)
+                if beam_id is not None:
+                    model.process.get_movement_summary_by_beam_id(beam_id)
 
             # Handelling UI_RUN
             if msg.type == BackgroundCommand.UI_GOTO_END_FRAME:
@@ -157,13 +168,15 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 if (model.ros_robot is None) or (not model.ros_robot.ros.is_connected):
                     logger_bg.info("Connect ROS Robot first.")
                 if model.run_status != RunStatus.STOPPED:
-                    logger_bg.info("Run Status is not stopped: %s. Stop it first." % model.run_status)
+                    logger_bg.info(
+                        "Run Status is not stopped: %s. Stop it first." % model.run_status)
                 else:
                     robot_goto_end_frame(guiref, model, q)
 
             return True
     except queue.Empty:
         return False
+
 
 def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
     # Run the Selected Item. If it is not a Movement, do nothing
@@ -172,7 +185,7 @@ def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
         logger_run.info("Selected item is not a movement")
         return False
 
-    movement = model.movements[move_id] # type: Movement
+    movement = model.movements[move_id]  # type: Movement
 
     if not hasattr(movement, 'target_frame'):
         logger_run.info("Selected movement does not have end frame.")
@@ -182,10 +195,10 @@ def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
     return True
 
 
-def wait_for_opeartor_confirm(guiref, model:RobotClampExecutionModel, message : str = "Confirm"):
-    """This is a blocking call that enables the confirm button witgh a message. 
+def wait_for_opeartor_confirm(guiref, model: RobotClampExecutionModel, message: str = "Confirm"):
+    """This is a blocking call that enables the confirm button witgh a message.
     Returns True if Operator presses the button.
-    Returns False if model.run_status changes to STOPPED indicating a stop. 
+    Returns False if model.run_status changes to STOPPED indicating a stop.
     """
     button = guiref['exe']['confirm_button']
     guiref['exe']['confirm_button_text'].set(message)
@@ -202,7 +215,7 @@ def wait_for_opeartor_confirm(guiref, model:RobotClampExecutionModel, message : 
             button.config(state="disabled", bg='grey')
             ui_update_run_status(guiref, model)
             return False
-    
+
 
 def program_run_thread(guiref, model: RobotClampExecutionModel, q):
     """ Thread for running programms. This thread exist when Run or Step is pressed.
@@ -220,31 +233,36 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         if not move_id.startswith('m'):
             move_id = treeview_select_next_movement(guiref)
 
-        movement = model.movements[move_id] # type: Movement
+        movement = model.movements[move_id]  # type: Movement
 
         # Pause before
         if movement.operator_stop_before != "":
-            confirm = wait_for_opeartor_confirm(guiref, model, movement.operator_stop_before)
-            if not confirm: 
-                logger_run.info("Operator stop not confirmed before movement. Run Thread Ended.")
+            confirm = wait_for_opeartor_confirm(
+                guiref, model, movement.operator_stop_before)
+            if not confirm:
+                logger_run.info(
+                    "Operator stop not confirmed before movement. Run Thread Ended.")
                 q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
                 break
-        
+
         # Execution
         success = execute_movement(model, movement)
 
         # Pause after
         if movement.operator_stop_after != "":
-            confirm = wait_for_opeartor_confirm(guiref, model, movement.operator_stop_after)
-            if not confirm: 
-                logger_run.info("Operator stop not confirmed after movement. Run Thread Ended.")
+            confirm = wait_for_opeartor_confirm(
+                guiref, model, movement.operator_stop_after)
+            if not confirm:
+                logger_run.info(
+                    "Operator stop not confirmed after movement. Run Thread Ended.")
                 q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
                 break
 
         # Terminate if execution is not success, do not increment pointer.
         if not success:
             model.run_status = RunStatus.ERROR
-            logger_run.info("Execution Error. Program Stopped. Run Thread Ended.")
+            logger_run.info(
+                "Execution Error. Program Stopped. Run Thread Ended.")
             q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
             break
 
@@ -283,15 +301,14 @@ def initialize_logging(filename: str):
     logger.info("App Started")
 
 
-
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='CLI RobotClampExecution.')
     parser.add_argument('-f', default='',  help='Load Process File on Start')
-    parser.add_argument('-robotip', default='192.168.0.117',  help='IP for Robot ROS Host')
-    parser.add_argument('-clampip', default='192.168.0.117',  help='IP for Clamp ROS Host')
+    parser.add_argument('-robotip', default='192.168.0.117',
+                        help='IP for Robot ROS Host')
+    parser.add_argument('-clampip', default='192.168.0.117',
+                        help='IP for Clamp ROS Host')
     args = parser.parse_args()
     print(args)
     # Initialize Logger
@@ -330,4 +347,4 @@ if __name__ == "__main__":
 
 
 # Development command line start with sample file opened:
-# python C:\Users\leungp\Documents\GitHub\clamp_controller\src\robot_clamp_controller\run.py -f C:\Users\leungp\Documents\GitHub\itj_design_study\210128_RemodelFredPavilion\twelve_pieces_process.json -robotip 192.168.20.128
+# python C:\Users\leungp\Documents\GitHub\clamp_controller\src\robot_clamp_controller\run.py -f C:\Users\leungp\Documents\GitHub\integral_timber_joints\external\itj_design_study\210128_RemodelFredPavilion\twelve_pieces_process.json -robotip 192.168.20.128
