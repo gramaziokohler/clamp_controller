@@ -15,7 +15,7 @@ from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.GUI import *
 from robot_clamp_controller.ProcessModel import RobotClampExecutionModel, RunStatus
-from robot_clamp_controller.Execute import execute_movement, robot_goto_frame
+from robot_clamp_controller.Execute import *
 import argparse
 
 
@@ -54,31 +54,41 @@ def background_thread(guiref, model: RobotClampExecutionModel, q):
             continue
     logger_bg.info("Background Thread Stopped")
 
+
 def on_background_command_arrival_check(
     msg, guiref,
     model: RobotClampExecutionModel,
-    target_bg_command:BackgroundCommand,
-    check_loaded_process = False,
-    check_robot_connection = False,
-    check_status_is_stopped = False,
-    ):
+    target_bg_command: BackgroundCommand,
+    check_loaded_process=False,
+    check_robot_connection=False,
+    check_status_is_stopped=False,
+    check_selected_is_movement=False
+):
     if msg.type != target_bg_command:
         return False
     if check_loaded_process:
         if model.process is None:
-            logger_bg.info("Load Process first.")
+            logger_bg.warn("Load Process first.")
             return False
     if check_robot_connection:
         if (model.ros_robot is None) or (not model.ros_robot.ros.is_connected):
-            logger_bg.info("Connect ROS Robot first.")
+            logger_bg.warn("Connect ROS Robot first.")
             return False
     if check_status_is_stopped:
         if model.run_status != RunStatus.STOPPED:
-            logger_bg.info("Run Status is not stopped: %s. Stop it first." % model.run_status)
+            logger_bg.warn(
+                "Run Status is not stopped: %s. Stop it first." % model.run_status)
+            return False
+    if check_selected_is_movement:
+        tree_row_id = treeview_get_selected_id(guiref)
+        if not tree_row_id.startswith('m'):
+            logger_bg.warn(
+                "Selected item is not a movement. Cannot proceed." % model.run_status)
             return False
     # Return True if every check is passed
     logger_bg.info("Processing BG Command: %s" % target_bg_command)
     return True
+
 
 def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
     try:
@@ -194,50 +204,49 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 for movement in movements_modified:
                     update_treeview_row(guiref, model, movement)
 
-            # Handelling UI_RUN
-            if msg.type == BackgroundCommand.UI_GOTO_END_FRAME:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_GOTO_START_FRAME.")
-                if model.process is None:
-                    logger_bg.info("Load Process first.")
-                if (model.ros_robot is None) or (not model.ros_robot.ros.is_connected):
-                    logger_bg.info("Connect ROS Robot first.")
-                if model.run_status != RunStatus.STOPPED:
-                    logger_bg.info(
-                        "Run Status is not stopped: %s. Stop it first." % model.run_status)
-                else:
-                    robot_goto_end_frame(guiref, model, q)
-
             # Handelling UI_GOTO_START_STATE
             if on_background_command_arrival_check(msg, guiref, model,
-                    BackgroundCommand.UI_GOTO_START_STATE,
-                    check_loaded_process = True, check_robot_connection = True, check_status_is_stopped = True):
-                    # check if the selected item is movement
-                    tree_row_id = treeview_get_selected_id(guiref)
-                    if not tree_row_id.startswith('m'):
-                        print ("Selected item is not a movement")
-                        return False
-                    # Retrive movement and check if state is available
-                    movement = model.movements[tree_row_id]
-                    if not model.process.movement_has_start_robot_config(movement):
-                        print ("Selected item is does not a start robot config")
-                        return False
+                                                   BackgroundCommand.UI_GOTO_START_STATE,
+                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
+                # Retrive movement and check if state is available
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                if not model.process.movement_has_start_robot_config(movement):
+                    logger_bg.warn(
+                        "Selected item does not have a START robot config")
+                    return False
 
-                    # Construct and send rrc command
-                    model.run_status = RunStatus.JOGGING
-                    import compas_rrc as rrc
-                    from compas_fab.robots import to_degrees
-                    start_state = model.process.get_movement_start_state(movement)
-                    point = start_state['robot'].kinematic_config
-                    ext_values = [m * 1000.0 for m in point.values[0:3]]
-                    joint_values = to_degrees(point.values[3:10])
-
-                    model.ros_robot.send(rrc.PrintText("Going to Start State of %s " % movement.movement_id))
-                    future = model.ros_robot.send(rrc.MoveToJoints(joint_values, ext_values, 1000, rrc.Zone.FINE))
-                    # TODO some while loop to wait for future or stop button
-
+                # Construct and send rrc command
+                state = model.process.get_movement_start_state(movement)
+                success = execute_jog_robot_to_state(
+                    model, state, message="Jogging to START State of %s " % movement.movement_id)
+                if not success:
+                    model.run_status = RunStatus.ERROR
+                else:
                     model.run_status = RunStatus.STOPPED
+                ui_update_run_status(guiref, model)
 
+            # Handelling UI_GOTO_END_STATE
+            if on_background_command_arrival_check(msg, guiref, model,
+                                                   BackgroundCommand.UI_GOTO_END_STATE,
+                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
+                # Retrive movement and check if state is available
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                if not model.process.movement_has_end_robot_config(movement):
+                    logger_bg.warn(
+                        "Selected item does not have an END robot config")
+                    return False
+
+                # Construct and send rrc command
+                state = model.process.get_movement_end_state(movement)
+                success = execute_jog_robot_to_state(
+                    model, state, message="Jogging to END State of %s " % movement.movement_id)
+                if not success:
+                    model.run_status = RunStatus.ERROR
+                else:
+                    model.run_status = RunStatus.STOPPED
+                ui_update_run_status(guiref, model)
             return True
     except queue.Empty:
         return False

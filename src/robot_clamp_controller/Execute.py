@@ -4,11 +4,14 @@ import time
 import logging
 import compas_rrc as rrc
 from compas_fab.robots import to_degrees
+from compas_fab.robots.configuration import Configuration
 
 
 logger_exe = logging.getLogger("app.exe")
 
-current_milli_time = lambda: int(round(time.time() * 1000))
+
+def current_milli_time(): return int(round(time.time() * 1000))
+
 
 def execute_movement(model: RobotClampExecutionModel, movement: Movement):
     """Return True if the movement is executed to completion without problem.
@@ -46,9 +49,18 @@ def execute_movement(model: RobotClampExecutionModel, movement: Movement):
 # Sub functions that handels different Movement Types
 #####################################################
 
+
 def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
-    """Return True if the movement is executed to completion without problem."""
-    # TODO IO pins are not calibrated.
+    """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
+
+    This functions blocks and waits for the completion. For example if operator did not
+    press Play on the robot contoller, this function will wait for it.
+    Return True if the movement is executed to completion without problem.
+
+    In case user wants to stop the wait, user can press the stop button
+    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
+    will return False.
+    """
     future_results = []  # type: List[rrc.FutureResult]
     # Open Gripper Valve
     if movement.digital_output == DigitalOutput.OpenGripper:
@@ -95,8 +107,52 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
 
     return True
 
-def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
 
+def execute_jog_robot_to_state(model, robot_state: Configuration, message: str = ""):
+    """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
+
+    This functions blocks and waits for the completion. For example if operator did not
+    press Play on the robot contoller, this function will wait for it.
+    Return True if the movement is executed to completion without problem.
+
+    In case user wants to stop the wait, user can press the stop button
+    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
+    will return False.
+    """
+    # Construct and send rrc command
+    model.run_status = RunStatus.JOGGING
+
+    point = robot_state['robot'].kinematic_config
+    ext_values = to_millimeters(point.values[0:3])
+    joint_values = to_degrees(point.values[3:10])
+
+    if message != "":
+        model.ros_robot.send(rrc.PrintText(message))
+    future = model.ros_robot.send(rrc.MoveToJoints(
+        joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE))
+
+    while (True):
+        if future.done:
+            logger_exe.info(
+                "execute_jog_robot_to_state complete")
+            return True
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn(
+                "execute_jog_robot_to_state Stopped before completion (future not arrived)")
+            return False
+
+
+def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
+    """Performs RoboticFreeMovement Movement by setting the robot's IO signals
+
+    This functions blocks and waits for the completion. For example if operator did not
+    press Play on the robot contoller, this function will wait for it.
+    Return True if the movement is executed to completion without problem.
+
+    In case user wants to stop the wait, user can press the stop button
+    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
+    will return False.
+    """
     if movement.trajectory is None:
         logger_exe.warn("Attempt to execute movement with no trajectory")
         return False
@@ -108,14 +164,18 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
         joint_values = to_degrees(point.values[3:10])
         zone = rrc.Zone.Z1
         speed = model.settings[movement.speed_type]
-        model.ros_robot.send(rrc.PrintText("Executing %s, %i of %i " % (movement.movement_id, n + 1, len(movement.trajectory.points))))
-        model.ros_robot.send(rrc.MoveToJoints(model.joint_offset(joint_values), ext_values, speed, zone))
+        model.ros_robot.send(rrc.PrintText("Executing %s, %i of %i " % (
+            movement.movement_id, n + 1, len(movement.trajectory.points))))
+        model.ros_robot.send(rrc.MoveToJoints(
+            model.joint_offset(joint_values), ext_values, speed, zone))
 
     return True
+
 
 def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: RoboticLinearMovement):
 
     return execute_robotic_free_movement(model, movement)
+
 
 def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, movement: RoboticClampSyncLinearMovement):
     points = movement.trajectory.points
@@ -128,15 +188,19 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
     #     pass
     return True
 
+
 def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: ClampsJawMovement):
     if (model.ros_clamps is None) or not model.ros_clamps.is_connected:
-        logger_exe.info("Clamp movement cannot start because Clamp ROS is not connected")
+        logger_exe.info(
+            "Clamp movement cannot start because Clamp ROS is not connected")
         return False
     # Remove clamp prefix:
-    clamp_ids = [clamp_id[1:] for clamp_id in  movement.clamp_ids]
+    clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
     velocity = model.settings[movement.speed_type]
-    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, movement.jaw_positions[0], velocity)
-    logger_exe.info("Clamp Jaw Movement Started: %s, seq_id = %s" % (movement, sequence_id))
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(
+        clamp_ids, movement.jaw_positions[0], velocity)
+    logger_exe.info("Clamp Jaw Movement Started: %s, seq_id = %s" %
+                    (movement, sequence_id))
     while (True):
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
             logger_exe.info("Clamp Jaw Movement completed")
@@ -157,12 +221,15 @@ def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
             return False
     return True
 
+
 def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
-    model.ros_robot.send_and_wait(rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
+    model.ros_robot.send_and_wait(rrc.MoveToFrame(
+        frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
 
 ##################
 # Helper Functions
 ##################
+
 
 def to_millimeters(meters):
     """Convert a list of floats representing meters to a list of millimeters.

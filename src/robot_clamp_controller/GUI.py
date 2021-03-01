@@ -358,18 +358,13 @@ def create_ui_execution(root, q: Queue):
     right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
     right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
 
-    def on_goto_end_button_click(event=None):
-        logger_ui.info("Button Pressed: GOTO END FRAME")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_FRAME))
-    tk.Button(right_frame, text="GOTO End Frame", command=on_goto_end_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO Start State")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
     tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_goto_end_state_button_click(event=None):
-        logger_ui.info("Button Pressed: GOTO Start State")
+        logger_ui.info("Button Pressed: GOTO END State")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
     tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
