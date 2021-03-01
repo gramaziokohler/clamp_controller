@@ -50,25 +50,39 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
     """Return True if the movement is executed to completion without problem."""
     # TODO IO pins are not calibrated.
     future_results = []  # type: List[rrc.FutureResult]
+    # Open Gripper Valve
     if movement.digital_output == DigitalOutput.OpenGripper:
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doTc11Valve1A', 1, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveA2', 0, feedback_level=1)))
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doTc11Valve1B', 0, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveB2', 1, feedback_level=1)))
 
+    # Close Gripper Valve
     if movement.digital_output == DigitalOutput.CloseGripper:
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doTc11Valve1A', 0, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveA2', 1, feedback_level=1)))
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doTc11Valve1B', 1, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveB2', 0, feedback_level=1)))
 
+    # Lock Tool Valve
     if movement.digital_output == DigitalOutput.LockTool:
         future_results.append(model.ros_robot.send(
-            rrc.CustomInstruction('r_Tc11_Lock', feedback_level=1)))
-
-    if movement.digital_output == DigitalOutput.UnlockTool:
+            rrc.SetDigital('doUnitR11ValveA1', 1, feedback_level=1)))
         future_results.append(model.ros_robot.send(
-            rrc.CustomInstruction('r_Tc11_Unlock', feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveB1', 0, feedback_level=1)))
+
+    # Unlock Tool Valve
+    if movement.digital_output == DigitalOutput.UnlockTool:
+        # Disconnect air supply to gripper feed through first
+        future_results.append(model.ros_robot.send(
+            rrc.SetDigital('doUnitR11ValveA2', 0, feedback_level=1)))
+        future_results.append(model.ros_robot.send(
+            rrc.SetDigital('doUnitR11ValveB2', 0, feedback_level=1)))
+        # This is the valve for the tool changer
+        future_results.append(model.ros_robot.send(
+            rrc.SetDigital('doUnitR11ValveA1', 0, feedback_level=1)))
+        future_results.append(model.ros_robot.send(
+            rrc.SetDigital('doUnitR11ValveB1', 1, feedback_level=1)))
 
     while (True):
         if all([future.done for future in future_results]):
@@ -81,6 +95,28 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
 
     return True
 
+def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
+
+    if movement.trajectory is None:
+        logger_exe.warn("Attempt to execute movement with no trajectory")
+        return False
+
+    for n, point in enumerate(movement.trajectory.points):
+
+        assert len(point.values) == 9
+        ext_values = to_millimeters(point.values[0:3])
+        joint_values = to_degrees(point.values[3:10])
+        zone = rrc.Zone.Z1
+        speed = model.settings[movement.speed_type]
+        model.ros_robot.send(rrc.PrintText("Executing %s, %i of %i " % (movement.movement_id, n + 1, len(movement.trajectory.points))))
+        model.ros_robot.send(rrc.MoveToJoints(model.joint_offset(joint_values), ext_values, speed, zone))
+
+    return True
+
+def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: RoboticLinearMovement):
+
+    return execute_robotic_free_movement(model, movement)
+
 def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, movement: RoboticClampSyncLinearMovement):
     points = movement.trajectory.points
     points_sent = 0
@@ -90,25 +126,6 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
     #     # Send points if the difference in two points are =< 1 and if we have more points left
     #
     #     pass
-    return True
-
-def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
-
-    if movement.trajectory is None:
-        logger_exe.warn("Attempt to execute movement with no trajectory")
-        return False
-
-    for n, point in enumerate(movement.trajectory.points):
-        print(point)
-        assert len(point.values) == 9
-        ext_values = to_millimeters(point.values[0:3])
-        joint_values = to_degrees(point.values[3:10])
-        zone = rrc.Zone.Z1
-        speed = model.settings[movement.speed_type]
-        model.ros_robot.send(rrc.MoveToJoints(model.joint_offset(joint_values), ext_values, speed, zone))
-    return True
-
-def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: RoboticLinearMovement):
     return True
 
 def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: ClampsJawMovement):
