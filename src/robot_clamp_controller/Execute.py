@@ -5,6 +5,7 @@ import logging
 import compas_rrc as rrc
 from compas_fab.robots import to_degrees
 from compas_fab.robots.configuration import Configuration
+import datetime
 
 
 logger_exe = logging.getLogger("app.exe")
@@ -156,18 +157,39 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     if movement.trajectory is None:
         logger_exe.warn("Attempt to execute movement with no trajectory")
         return False
+    futures = []
+    active_point = 0
+    total_steps = len(movement.trajectory.points)
+    last_time = datetime.datetime.now()
+    buffering_steps = 2  # Number of steps to allow in the robot buffer
 
-    for n, point in enumerate(movement.trajectory.points):
+    for current_step, point in enumerate(movement.trajectory.points):
 
+        # Lopping while active_point is just 1 before the current_step.
+        while (True):
+            # Break the while loop and allow next point
+            if active_point >= current_step - buffering_steps:
+                break
+            # Advance pointer when future is done
+            if futures[active_point].done:
+                print("Point %i is done. Delta time %f seconds." %
+                      (active_point, (datetime.datetime.now() - last_time).total_seconds()))
+                last_time = datetime.datetime.now()
+                active_point += 1
+            # Breaks entirely if model.run_status is STOPPED
+            if model.run_status == RunStatus.STOPPED:
+                logger_exe.warn("execute_robotic_free_movement stopped before completion (future not arrived)")
+                return False
+
+        # Format and send robot command
+        logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
         assert len(point.values) == 9
-        ext_values = to_millimeters(point.values[0:3])
-        joint_values = to_degrees(point.values[3:10])
-        zone = rrc.Zone.Z1
+        j = to_degrees(point.values[3:10])
+        e = to_millimeters(point.values[0:3])
         speed = model.settings[movement.speed_type]
-        model.ros_robot.send(rrc.PrintText("Executing %s, %i of %i " % (
-            movement.movement_id, n + 1, len(movement.trajectory.points))))
-        model.ros_robot.send(rrc.MoveToJoints(
-            model.joint_offset(joint_values), ext_values, speed, zone))
+        zone = rrc.Zone.Z1
+        future = model.ros_robot.send(rrc.MoveToJoints(j, e, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
+        futures.append(future)
 
     return True
 

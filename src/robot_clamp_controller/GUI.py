@@ -210,7 +210,6 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
             update_treeview_row(guiref, model, movement)
             guiref['process']['item_ids'].append(movement.tree_row_id)
 
-
             # tree.see(movement_item)
             if tree.selection() == ():
                 tree.selection_set(movement_item)
@@ -244,11 +243,11 @@ def update_treeview_row(guiref, model, movement):
 
     values[0] = movement.movement_id           # movement_id
     values[1] = movement.__class__.__name__    # description
-    values[2] = movement.tag         #details
+    values[2] = movement.tag  # details
     values[3] = traj_description
     values[4] = movement.speed_type if hasattr(movement, 'speed_type') else ""
     values[5] = model.settings[movement.speed_type] if hasattr(movement, 'speed_type') else ""
-    tree.item(tree_row_id, values = values)
+    tree.item(tree_row_id, values=values)
 
 
 def treeview_get_selected_id(guiref):
@@ -361,12 +360,14 @@ def create_ui_execution(root, q: Queue):
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO Start State")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
-    tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+    tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_goto_end_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO END State")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
-    tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+    tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_print_summary_button_click(event=None):
         logger_ui.info("Button Pressed: Print Selected Beam Action Summary")
