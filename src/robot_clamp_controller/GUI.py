@@ -204,17 +204,13 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
 
         # Movement Rows
         for j, movement in enumerate(action.movements):
-            movement_id = movement.movement_id
-            description = movement.__class__.__name__
-            details = "%s" % movement
-            traj_points = ""
-            speed_type = movement.speed_type if hasattr(
-                movement, 'speed_type') else ""
-            speed = model.settings[speed_type] if hasattr(
-                movement, 'speed_type') else ""
+            # Add row and delegate the fill-in to update_treeview_row()
             movement_item = tree.insert(parent=action_item, index="end", iid=movement.tree_row_id, text="Movement %i" % j,
-                                        values=(movement_id, description, details, traj_points, speed_type, speed, beam_id))
+                                        values=("", "", "", "", "", "", beam_id))
+            update_treeview_row(guiref, model, movement)
             guiref['process']['item_ids'].append(movement.tree_row_id)
+
+
             # tree.see(movement_item)
             if tree.selection() == ():
                 tree.selection_set(movement_item)
@@ -231,9 +227,12 @@ def update_treeview_row(guiref, model, movement):
     # type: (dict, RobotClampExecutionModel, Movement) -> None
     tree = guiref['process']['tree']  # type: ttk.Treeview
     tree_row_id = movement.tree_row_id
+
+    # Retrive the values by row, change them and set them back.
+    # This is the pattern supported by ttk
     row = tree.item(tree_row_id)
     values = row['values']
-    print (row['values'])
+
     # Generate trajectory description:
     if isinstance(movement, RoboticMovement):
         if movement.trajectory is None:
@@ -245,12 +244,11 @@ def update_treeview_row(guiref, model, movement):
 
     values[0] = movement.movement_id           # movement_id
     values[1] = movement.__class__.__name__    # description
-    values[2] = "%s" % movement                #details
+    values[2] = movement.tag         #details
     values[3] = traj_description
     values[4] = movement.speed_type if hasattr(movement, 'speed_type') else ""
     values[5] = model.settings[movement.speed_type] if hasattr(movement, 'speed_type') else ""
     tree.item(tree_row_id, values = values)
-
 
 
 def treeview_get_selected_id(guiref):
@@ -363,9 +361,17 @@ def create_ui_execution(root, q: Queue):
     def on_goto_end_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO END FRAME")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_FRAME))
-    ui_handles['goto_end_button'] = tk.Button(
-        right_frame, text="GOTO End Frame", command=on_goto_end_button_click, font=tk.big_button_font, width=20)
-    ui_handles['goto_end_button'].pack(fill=tk.X, side=tk.TOP)
+    tk.Button(right_frame, text="GOTO End Frame", command=on_goto_end_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_goto_start_state_button_click(event=None):
+        logger_ui.info("Button Pressed: GOTO Start State")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
+    tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_goto_end_state_button_click(event=None):
+        logger_ui.info("Button Pressed: GOTO Start State")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
+    tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click, font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_print_summary_button_click(event=None):
         logger_ui.info("Button Pressed: Print Selected Beam Action Summary")

@@ -29,10 +29,11 @@ logger_ros = logging.getLogger("app.ros")
 
 
 class RunStatus(Enum):
-    RUNNING = 0
-    STEPPING_FORWARD = 1
-    ERROR = 2
-    STOPPED = 3
+    RUNNING = auto()
+    STEPPING_FORWARD = auto()
+    ERROR = auto()
+    STOPPED = auto()
+    JOGGING = auto()
 
 
 class RobotClampExecutionModel(object):
