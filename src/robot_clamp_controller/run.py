@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import logging
 import queue
@@ -13,10 +14,10 @@ from clamp_controller.ClampModel import ClampModel
 from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 
 from robot_clamp_controller.BackgroundCommand import *
-from robot_clamp_controller.GUI import *
-from robot_clamp_controller.ProcessModel import RobotClampExecutionModel, RunStatus
 from robot_clamp_controller.Execute import *
-import argparse
+from robot_clamp_controller.GUI import *
+from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
+                                                 RunStatus)
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
@@ -105,6 +106,17 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     guiref['process']['process_status'].set(
                         model.process_description)
                 init_actions_tree_view(guiref, model)
+
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_OPEN_SETTING):
+                # model.open_setting_file()
+                path = model.settings_file_path_default()
+                master = guiref['root']
+                popup = SettingsPopupWindow(master, path)
+                master.wait_window(popup.top)
+                with open(path, 'w') as f:
+                    f.write(popup.value)
+                model.load_settings()
+                logger_bg.info("Settings Saved")
 
             # Handle UI_UPDATE_STATUS
             if msg.type == BackgroundCommand.UI_UPDATE_STATUS:
@@ -205,8 +217,7 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                     update_treeview_row(guiref, model, movement)
 
             # Handelling UI_GOTO_START_STATE
-            if on_background_command_arrival_check(msg, guiref, model,
-                                                   BackgroundCommand.UI_GOTO_START_STATE,
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_GOTO_START_STATE,
                                                    check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -227,8 +238,7 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_GOTO_END_STATE
-            if on_background_command_arrival_check(msg, guiref, model,
-                                                   BackgroundCommand.UI_GOTO_END_STATE,
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
                                                    check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -400,7 +410,7 @@ if __name__ == "__main__":
     model = RobotClampExecutionModel()
     # Get GUI Reference
     guiref = create_execution_gui(root, q)
-
+    guiref['root'] = root
     # Start the background thread that processes UI commands
     t1 = Thread(target=background_thread, args=(guiref, model, q))
     t1.daemon = True

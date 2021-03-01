@@ -118,6 +118,18 @@ class RobotClampExecutionModel(object):
                 movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
                 self.movements[movement.tree_row_id] = movement
 
+    def settings_file_path_default(self):
+        return os.path.join(tempfile.gettempdir(), "itj_process_execution_setting.json")
+
+    def open_setting_file(self, path=None):
+        """Opens the setting fiel in note pad """
+        if path is None:
+            path = self.settings_file_path_default()
+        # Load Previously saved settings if exist
+        if os.path.exists(path):
+            osCommandString = "notepad.exe " + path
+            os.system(osCommandString)
+
     def load_external_movements(self):
         # type: () -> list(Movement)
         """Load External Movements, returns all the movements modified"""

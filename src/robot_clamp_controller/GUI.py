@@ -9,9 +9,10 @@ from typing import Dict, List, Optional, Tuple
 from integral_timber_joints.process.action import *
 from integral_timber_joints.process.movement import *
 
+from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
                                                  RunStatus)
-from robot_clamp_controller.BackgroundCommand import *
+
 logger_ui = logging.getLogger("app.gui")
 
 
@@ -24,10 +25,6 @@ def create_execution_gui(root, q):
         family="Lucida Console", size=25, weight='bold')
 
     ui_handles = {}
-    # ui_handles['connect'] = create_ui_connect(root, q)
-    # ui_handles['status'] = create_ui_status(root, q, clamps)
-    # ui_handles['control'] = create_ui_control(root, q)
-    #ui_handles['logging'] = create_ui_logging(root, q)
     ui_handles['ros'] = create_ui_ros(root, q)
     ui_handles['process'] = create_ui_process(root, q)
     ui_handles['exe'] = create_ui_execution(root, q)
@@ -58,6 +55,12 @@ def create_ui_ros(root, q: Queue):
     robot_ip_entrybox.pack(side=tk.LEFT)
     tk.Button(frame, text="Connect",
               command=on_robot_ros_connect_button_click).pack(side=tk.LEFT)
+
+    def on_open_settings_button_click(event=None):
+        logger_ui.info("Button Pressed: Open Settings")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_OPEN_SETTING))
+    tk.Button(frame, text="Speed Settings",
+              command=on_open_settings_button_click).pack(side=tk.LEFT)
     # Status Label
     tk.Label(frame, text="Status: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -388,3 +391,22 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
         guiref['exe']['exe_status'].set("Running")
     if model.run_status == RunStatus.ERROR:
         guiref['exe']['exe_status'].set("Error Stopped")
+
+
+class SettingsPopupWindow(object):
+    def __init__(self, master, path):
+        existing_setting = open(path, "r")
+
+
+        top = self.top = tk.Toplevel(master)
+        self.l = tk.Label(top, text="Change the settings here")
+        self.l.pack()
+        self.e = tk.Text(top)
+        self.e.pack(side=tk.LEFT, fill=tk.BOTH)
+        self.e.insert(tk.END, existing_setting.read())
+        self.b = tk.Button(top, text='Save', command=self.cleanup)
+        self.b.pack()
+
+    def cleanup(self):
+        self.value = self.e.get('1.0', tk.END)
+        self.top.destroy()
