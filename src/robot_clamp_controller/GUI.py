@@ -378,6 +378,22 @@ def create_ui_execution(root, q: Queue):
     tk.Button(right_frame, text="Print Selected Beam Action Summary",
               command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
+    right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
+
+    def on_goto_start_state_button_click(event=None):
+        logger_ui.info("Button Pressed: Robot Soft Mode")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_ENABLE))
+    tk.Button(right_frame_2, text="Robot Soft Mode", command=on_goto_start_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_goto_end_state_button_click(event=None):
+        logger_ui.info("Button Pressed: Robot Hard Mode")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_DISABLE))
+    tk.Button(right_frame_2, text="Robot Hard Mode", command=on_goto_end_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+
     return ui_handles
 
 

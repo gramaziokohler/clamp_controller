@@ -245,9 +245,33 @@ def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
 
 
 def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
+    """Blocking call to go to a frame. Not cancelable."""
     model.ros_robot.send_and_wait(rrc.MoveToFrame(
         frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
 
+
+def robot_softmode(model: RobotClampExecutionModel, enable : bool, soft_direction = "Z", stiffness = 50, stiffness_non_soft_dir = 100):
+    """Non-blocking call to enable or disable soft move. Not cancelable.
+    `soft_direction` modes available are "Z", "XY", "XYZ", "XYRZ"
+    - use "XY" or "XYRZ" for pushing hard but allow deviation
+    - use "Z" to avoid pushing hard but be accurate on other axis.
+
+    `stiffness` in the specified direction, 0 is softest, 100 is stiffness
+    `stiffness` in the other non specified direction, 0 is softest, 100 is stiffness
+
+    future result is returned.
+    """
+    model.ros_robot.send(rrc.SetTool('t_A067_T1_Gripper')) # TODO: This should not be hard coded.
+    if enable:
+        future = model.ros_robot.send(rrc.CustomInstruction("r_A067_ActSoftMove",
+            string_values=[soft_direction],
+            float_values=[stiffness, stiffness_non_soft_dir], feedback_level=rrc.FeedbackLevel.DONE))
+        logger_exe.info("robot_softmode Enabled")
+    else:
+        future = model.ros_robot.send(rrc.CustomInstruction("r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
+        logger_exe.info("robot_softmode Disabled")
+
+    return future
 ##################
 # Helper Functions
 ##################

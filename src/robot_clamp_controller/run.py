@@ -64,7 +64,7 @@ def on_background_command_arrival_check(
     check_robot_connection=False,
     check_status_is_stopped=False,
     check_selected_is_movement=False
-):
+    ):
     if msg.type != target_bg_command:
         return False
     if check_loaded_process:
@@ -257,6 +257,20 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 else:
                     model.run_status = RunStatus.STOPPED
                 ui_update_run_status(guiref, model)
+
+            # Handelling UI_SOFTMODE_ENABLE
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE,
+                                                check_robot_connection=True, check_status_is_stopped=True):
+                # Softmode on
+                robot_softmode(model, True, "XYZ", 20, 50)
+
+            # Handelling UI_SOFTMODE_DISABLE
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE,
+                                                check_robot_connection=True, check_status_is_stopped=True):
+                # Softmode off
+                robot_softmode(model, False)
+
+            # Returns True if a command is consumed
             return True
     except queue.Empty:
         return False
