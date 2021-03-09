@@ -334,7 +334,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         movement = model.movements[move_id]  # type: Movement
 
         # Pause before
-        if movement.operator_stop_before != "":
+        if movement.operator_stop_before is not None:
             confirm = wait_for_opeartor_confirm(
                 guiref, model, movement.operator_stop_before)
             if not confirm:
@@ -347,7 +347,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         success = execute_movement(model, movement)
 
         # Pause after
-        if movement.operator_stop_after != "":
+        if movement.operator_stop_after is not None:
             confirm = wait_for_opeartor_confirm(
                 guiref, model, movement.operator_stop_after)
             if not confirm:

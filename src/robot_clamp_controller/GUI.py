@@ -120,7 +120,7 @@ def create_ui_process(root, q: Queue):
                 type=BackgroundCommand.MODEL_LOAD_PROCESS, json_path=filename))
 
     def on_load_ext_movement_button_click(event=None):
-        logger_ui.info("Button Pressed: Confirm")
+        logger_ui.info("Button Pressed: Load Ext Movement")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_LOAD_EXT_MOVEMENT))
 
     tk.Label(frame, text="Process JSON: ", font=tk.font_key,
