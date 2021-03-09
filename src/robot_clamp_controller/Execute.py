@@ -154,6 +154,11 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     on UI (sets the model.run_status to RunStatus.STOPPED) and this function
     will return False.
     """
+
+    INTERMEDIATE_ZONE = rrc.Zone.Z5
+    FINAL_ZONE = rrc.Zone.FINE
+    STEPS_TO_BUFFER = 2  # Number of steps to allow in the robot buffer
+
     if movement.trajectory is None:
         logger_exe.warn("Attempt to execute movement with no trajectory")
         return False
@@ -161,14 +166,13 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     active_point = 0
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
-    buffering_steps = 2  # Number of steps to allow in the robot buffer
 
     for current_step, point in enumerate(movement.trajectory.points):
 
         # Lopping while active_point is just 1 before the current_step.
         while (True):
             # Break the while loop and allow next point
-            if active_point >= current_step - buffering_steps:
+            if active_point >= current_step - STEPS_TO_BUFFER:
                 break
             # Advance pointer when future is done
             if futures[active_point].done:
@@ -187,7 +191,11 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
         j = to_degrees(point.values[3:10])
         e = to_millimeters(point.values[0:3])
         speed = model.settings[movement.speed_type]
-        zone = rrc.Zone.Z1
+        # zone for intermediate
+        if current_step < total_steps - 1:
+            zone = INTERMEDIATE_ZONE
+        else:
+            zone = FINAL_ZONE
         future = model.ros_robot.send(rrc.MoveToJoints(j, e, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
         futures.append(future)
 
@@ -250,7 +258,7 @@ def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
         frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
 
 
-def robot_softmode(model: RobotClampExecutionModel, enable : bool, soft_direction = "Z", stiffness = 50, stiffness_non_soft_dir = 100):
+def robot_softmode(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=50, stiffness_non_soft_dir=100):
     """Non-blocking call to enable or disable soft move. Not cancelable.
     `soft_direction` modes available are "Z", "XY", "XYZ", "XYRZ"
     - use "XY" or "XYRZ" for pushing hard but allow deviation
@@ -261,14 +269,15 @@ def robot_softmode(model: RobotClampExecutionModel, enable : bool, soft_directio
 
     future result is returned.
     """
-    model.ros_robot.send(rrc.SetTool('t_A067_T1_Gripper')) # TODO: This should not be hard coded.
+    model.ros_robot.send(rrc.SetTool('t_A067_T1_Gripper'))  # TODO: This should not be hard coded.
     if enable:
         future = model.ros_robot.send(rrc.CustomInstruction("r_A067_ActSoftMove",
-            string_values=[soft_direction],
-            float_values=[stiffness, stiffness_non_soft_dir], feedback_level=rrc.FeedbackLevel.DONE))
+                                                            string_values=[soft_direction],
+                                                            float_values=[stiffness, stiffness_non_soft_dir], feedback_level=rrc.FeedbackLevel.DONE))
         logger_exe.info("robot_softmode Enabled")
     else:
-        future = model.ros_robot.send(rrc.CustomInstruction("r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
+        future = model.ros_robot.send(rrc.CustomInstruction(
+            "r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
         logger_exe.info("robot_softmode Disabled")
 
     return future
