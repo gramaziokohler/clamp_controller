@@ -20,7 +20,13 @@ def execute_movement(model: RobotClampExecutionModel, movement: Movement):
     This is a blocking call that returns only if a movement is completed
     or if model.run_status == RunStatus.STOPPED. """
 
-    logger_exe.info("Executing Movement: %s" % movement)
+    logger_exe.info("Executing Movement: %s" % movement.tag)
+    logger_exe.info(" - %s" % movement)
+
+    model.ros_robot.send(rrc.CustomInstruction(
+        'r_A067_TPPlot', ["Executing Movement (%s)" % (movement.movement_id)], []))
+    model.ros_robot.send(rrc.CustomInstruction(
+        'r_A067_TPPlot', ["- %s" % (movement.tag[:40]) + '...'], []))
 
     if isinstance(movement, OperatorLoadBeamMovement):
         print("Operator should load beam %s. Grasp face is %s." %
