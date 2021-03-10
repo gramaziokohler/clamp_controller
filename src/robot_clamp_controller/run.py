@@ -115,10 +115,11 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 master = guiref['root']
                 popup = SettingsPopupWindow(master, path)
                 master.wait_window(popup.top)
-                with open(path, 'w') as f:
-                    f.write(popup.value)
-                model.load_settings()
-                logger_bg.info("Settings Saved")
+                if hasattr(popup, 'value'):
+                    with open(path, 'w') as f:
+                        f.write(popup.value)
+                    model.load_settings()
+                    logger_bg.info("Settings Saved")
 
             # Handle UI_UPDATE_STATUS
             if msg.type == BackgroundCommand.UI_UPDATE_STATUS:
