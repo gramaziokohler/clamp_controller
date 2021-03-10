@@ -393,7 +393,6 @@ def create_ui_execution(root, q: Queue):
     tk.Button(right_frame_2, text="Robot Hard Mode", command=on_goto_end_state_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
-
     return ui_handles
 
 
@@ -401,18 +400,24 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
     """Update the labels and indications related to execution"""
     if model.run_status == RunStatus.STOPPED:
         guiref['exe']['exe_status'].set("Stopped")
+        guiref['exe']['exe_status_label'].config(bg="gray")
     if model.run_status == RunStatus.STEPPING_FORWARD:
         guiref['exe']['exe_status'].set("Stepping")
+        guiref['exe']['exe_status_label'].config(bg="green")
+    if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
+        guiref['exe']['exe_status'].set("Stepping Fm Pt")
+        guiref['exe']['exe_status_label'].config(bg="green")
     if model.run_status == RunStatus.RUNNING:
         guiref['exe']['exe_status'].set("Running")
+        guiref['exe']['exe_status_label'].config(bg="green")
     if model.run_status == RunStatus.ERROR:
         guiref['exe']['exe_status'].set("Error Stopped")
+        guiref['exe']['exe_status_label'].config(bg="red")
 
 
 class SettingsPopupWindow(object):
     def __init__(self, master, path):
         existing_setting = open(path, "r")
-
 
         top = self.top = tk.Toplevel(master)
         self.l = tk.Label(top, text="Change the settings here")

@@ -262,13 +262,13 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
             if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE,
                                                 check_robot_connection=True, check_status_is_stopped=True):
                 # Softmode on
-                robot_softmode(model, True, "XYZ", 20, 50)
+                robot_softmove(model, True, "XYZ", 20, 50)
 
             # Handelling UI_SOFTMODE_DISABLE
             if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE,
                                                 check_robot_connection=True, check_status_is_stopped=True):
                 # Softmode off
-                robot_softmode(model, False)
+                robot_softmove(model, False)
 
             # Returns True if a command is consumed
             return True
