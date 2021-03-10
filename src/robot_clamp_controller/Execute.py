@@ -167,6 +167,15 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
+    # Check soft move state and send softmove command is state is different.
+    # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
+    success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction="XYZ",
+                                stiffness=40, stiffness_non_soft_dir=50)
+    if not success:
+        logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+        return False
+
+
     for current_step, point in enumerate(movement.trajectory.points):
 
         # Lopping while active_point is just 1 before the current_step.
@@ -176,8 +185,8 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
                 break
             # Advance pointer when future is done
             if futures[active_point].done:
-                print("Point %i is done. Delta time %f seconds." %
-                      (active_point, (datetime.datetime.now() - last_time).total_seconds()))
+                logger_exe.debug("Point %i is done. Delta time %f seconds." %
+                                 (active_point, (datetime.datetime.now() - last_time).total_seconds()))
                 last_time = datetime.datetime.now()
                 active_point += 1
             # Breaks entirely if model.run_status is STOPPED
@@ -258,7 +267,7 @@ def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
         frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
 
 
-def robot_softmode(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=50, stiffness_non_soft_dir=100):
+def robot_softmove(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=50, stiffness_non_soft_dir=100):
     """Non-blocking call to enable or disable soft move. Not cancelable.
     `soft_direction` modes available are "Z", "XY", "XYZ", "XYRZ"
     - use "XY" or "XYRZ" for pushing hard but allow deviation
@@ -274,13 +283,52 @@ def robot_softmode(model: RobotClampExecutionModel, enable: bool, soft_direction
         future = model.ros_robot.send(rrc.CustomInstruction("r_A067_ActSoftMove",
                                                             string_values=[soft_direction],
                                                             float_values=[stiffness, stiffness_non_soft_dir], feedback_level=rrc.FeedbackLevel.DONE))
-        logger_exe.info("robot_softmode Enabled")
+        logger_exe.info("robot_softmove(Enabled) command sent.")
     else:
         future = model.ros_robot.send(rrc.CustomInstruction(
             "r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
-        logger_exe.info("robot_softmode Disabled")
+        logger_exe.info("robot_softmove(Disable) command sent.")
 
     return future
+
+
+def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=50, stiffness_non_soft_dir=100):
+    """Blocking call to change robot's softmove state. It can be used to enable or disable the softmove.
+    When success, the state is set to model.ros_robot_state_softmove_enabled
+
+    If the current model.ros_robot_state_softmove_enabled is the same as the `enable` input,
+    no command will be sent and will immediately return True.
+
+    This functions blocks and waits for the completion. For example if operator did not
+    press Play on the robot contoller, this function will wait for it.
+    Return True if the command is executed to completion without problem.
+
+    In case user wants to stop the wait, user can press the stop button
+    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
+    will return False.
+    """
+
+    if (model.ros_robot_state_softmove_enabled is None) or (model.ros_robot_state_softmove_enabled != enable):
+
+        result = robot_softmove(model, enable, soft_direction=soft_direction, stiffness=stiffness,
+                    stiffness_non_soft_dir=stiffness_non_soft_dir)
+        while (True):
+            # Wait until softmove state is set.
+            if result.done:
+                logger_exe.info("Softmove is now %s" % ("Enabled" if enable else "Disabled"))
+                model.ros_robot_state_softmove_enabled = enable
+                return True
+            # Stop waiting if model.run_status is STOPPED
+            if model.run_status == RunStatus.STOPPED:
+                logger_exe.warn(
+                    "robot_softmove_blocking stopped before future.done arrived")
+                return False
+
+    else:
+        logger_exe.debug("robot_softmove_blocking() skipped - current softmove state (%s) is the same." % model.ros_robot_state_softmove_enabled)
+        return True
+
+
 ##################
 # Helper Functions
 ##################

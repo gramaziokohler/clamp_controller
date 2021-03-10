@@ -13,9 +13,9 @@ from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from compas.utilities import DataDecoder
 from compas_fab.backends.ros import RosClient
 from compas_rrc import AbbClient
-from integral_timber_joints.process import (Action, Movement, LoadBeamAction,
+from integral_timber_joints.process import (Action, LoadBeamAction,
                                             RobotClampAssemblyProcess)
-
+from integral_timber_joints.process.movement import *
 from robot_clamp_controller.BackgroundCommand import *
 
 
@@ -57,7 +57,12 @@ class RobotClampExecutionModel(object):
         self.ros_robot: AbbClient = None
         self.operator_confirm = False
 
-        self.current_action: Action = None  # Pointer to the currently selected action
+        # Robot states
+        self.ros_robot_state_softmove_enabled = None
+
+
+        # Pointer to the currently selected action
+        self.current_action: Action = None
         # Pointer to the currently selected movement
         self.current_movement: Movement = None
 
@@ -110,6 +115,11 @@ class RobotClampExecutionModel(object):
         logger_model.info("load_process(): %s" % self.process_description)
         self.process_path = json_path
 
+        # Load external movements if possible
+        self.load_external_movements()
+        # mark_movements_as_soft_move
+        self._mark_movements_as_softmove()
+
         # Organize movements into an OrderedDict collection for easier manupulation
         self.movements = OrderedDict()  # type : OrderedDict(Movement)
         for i, action in enumerate(self.process.actions):
@@ -117,6 +127,25 @@ class RobotClampExecutionModel(object):
             for move_n, movement in enumerate(action.movements):
                 movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
                 self.movements[movement.tree_row_id] = movement
+
+
+    def _mark_movements_as_softmove(self):
+        # type: () -> None
+        """Marks the final movements of the assembly process as soft move."""
+        process = self.process
+        for i, action in enumerate(process.actions):
+            for j, movement in enumerate(action.movements):
+                # Default
+                movement.softmove = False
+                # Softmove cases
+                if isinstance(movement, RoboticClampSyncLinearMovement) and movement.speed_type == 'speed.assembly.clamping':
+                        movement.softmove = True
+                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
+                if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
+                        movement.softmove = True
+                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
+
+
 
     def settings_file_path_default(self):
         return os.path.join(tempfile.gettempdir(), "itj_process_execution_setting.json")
