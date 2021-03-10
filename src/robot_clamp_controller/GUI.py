@@ -356,8 +356,8 @@ def create_ui_execution(root, q: Queue):
     middle_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
 
     ui_handles['exe_status'] = tk.StringVar(value="Stopped")
-    tk.Label(middle_frame, textvariable=ui_handles['exe_status'], font=tk.big_status_font, anchor=tk.CENTER, height=2).pack(
-        side=tk.TOP, fill=tk.BOTH, padx=10)
+    ui_handles['exe_status_label'] = tk.Label(middle_frame, textvariable=ui_handles['exe_status'], font=tk.big_status_font, anchor=tk.CENTER, height=2)
+    ui_handles['exe_status_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
     def on_confirm_button_click(event=None):
         logger_ui.info("Button Pressed: Confirm")
