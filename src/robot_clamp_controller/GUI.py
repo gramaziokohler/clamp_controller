@@ -218,11 +218,23 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
                 tree.selection_set(movement_item)
 
     tree.see(tree.selection())
+    logger_ui.info("Actions Treeview Updated")
+
+
+def enable_run_buttons(guiref):
     # Enable Run buttons
     guiref['exe']['run_button'].config(state="normal")
     guiref['exe']['step_button'].config(state="normal")
+    guiref['exe']['step_from_pt_button'].config(state="normal")
     guiref['exe']['stop_button'].config(state="normal")
-    logger_ui.info("Actions Treeview Updated")
+
+
+def disable_run_buttons(guiref):
+    # Enable Run buttons
+    guiref['exe']['run_button'].config(state="disabled")
+    guiref['exe']['step_button'].config(state="disabled")
+    guiref['exe']['step_from_pt_button'].config(state="disabled")
+    guiref['exe']['stop_button'].config(state="disabled")
 
 
 def update_treeview_row(guiref, model, movement):

@@ -101,11 +101,13 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
             if msg.type == BackgroundCommand.MODEL_LOAD_PROCESS:
                 logger_bg.info(
                     "Relaying BackgroundCommand: MODEL_LOAD_PROCESS")
+                disable_run_buttons(guiref)
                 model.load_process(msg.json_path)
                 if model is not None:
                     guiref['process']['process_status'].set(
                         model.process_description)
                 init_actions_tree_view(guiref, model)
+                enable_run_buttons(guiref)
 
             if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_OPEN_SETTING):
                 # model.open_setting_file()
