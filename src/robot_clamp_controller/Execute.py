@@ -103,6 +103,9 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
         future_results.append(model.ros_robot.send(
             rrc.SetDigital('doUnitR11ValveB1', 1, feedback_level=1)))
 
+    # Add some delay after the action
+    future_results.append(model.ros_robot.send(rrc.WaitTime(2, feedback_level=1)))
+
     while (True):
         if all([future.done for future in future_results]):
             return True
