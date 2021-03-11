@@ -142,14 +142,35 @@ def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Dont do anyhting if program is already running
 
             # Handelling UI_STEP
-            if msg.type == BackgroundCommand.UI_STEP:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_STEP")
-                if model.process is None:
-                    logger_bg.info("Load Process first")
-                else:
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_STEP,
+                        check_loaded_process=True, check_robot_connection=True, ):
+                # Change Status
+                model.run_status = RunStatus.STEPPING_FORWARD
+                # Start a new thread if the current one is not active
+                if model.run_thread is None or not model.run_thread.isAlive():
+                    model.run_thread = Thread(
+                        target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.start()
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_STEP_FROM_POINT
+            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_STEP_FROM_POINT,
+                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
                     # Change Status
-                    model.run_status = RunStatus.STEPPING_FORWARD
+                    model.run_status = RunStatus.STEPPING_FORWARD_FROM_PT
+
+                    # Retrive movement and check if state is available
+                    tree_row_id = treeview_get_selected_id(guiref)
+                    movement = model.movements[tree_row_id]
+                    max_start_number = len(movement.trajectory.points) - 1
+                    popup = AlternativeStartPointWindow(guiref['root'], max_start_number)
+                    guiref['root'].wait_window(popup.top)
+                    n = popup.value
+                    if n > max_start_number:
+                        logger_bg.warm("Input number larger than number of trajectory points")
+                        return True
+
+                    model.alternative_start_point = n
                     # Start a new thread if the current one is not active
                     if model.run_thread is None or not model.run_thread.isAlive():
                         model.run_thread = Thread(
@@ -371,7 +392,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         treeview_select_next_movement(guiref)
 
         # Stop execution if it is currently in STEPPING mode.
-        if model.run_status == RunStatus.STEPPING_FORWARD:
+        if model.run_status == RunStatus.STEPPING_FORWARD or model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT :
             model.run_status = RunStatus.STOPPED
 
         # Status note that the RUN Thread is Stopped

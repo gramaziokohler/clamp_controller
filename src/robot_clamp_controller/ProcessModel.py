@@ -31,6 +31,7 @@ logger_ros = logging.getLogger("app.ros")
 class RunStatus(Enum):
     RUNNING = auto()
     STEPPING_FORWARD = auto()
+    STEPPING_FORWARD_FROM_PT = auto()
     ERROR = auto()
     STOPPED = auto()
     JOGGING = auto()
@@ -89,7 +90,7 @@ class RobotClampExecutionModel(object):
             'speed.toolchange.retract.clamp_on_structure': 5,
             'speed.assembly.inclamp': 50,   # Sliding beam into clamp.
             'speed.assembly.noclamp': 20,   # Simply putting it down
-            'speed.assembly.clamping': 20,  #
+            'speed.assembly.clamping': 2,  #
             'speed.gripper.approach': 50,  # Approaching Pickup Station
             'speed.gripper.retract': 50,    # Retract after placing
             'speed.clamp.rapid': 5,

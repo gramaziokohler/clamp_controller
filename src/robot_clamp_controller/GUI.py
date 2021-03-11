@@ -25,6 +25,7 @@ def create_execution_gui(root, q):
         family="Lucida Console", size=25, weight='bold')
 
     ui_handles = {}
+    ui_handles['root'] = root
     ui_handles['ros'] = create_ui_ros(root, q)
     ui_handles['process'] = create_ui_process(root, q)
     ui_handles['exe'] = create_ui_execution(root, q)
@@ -189,16 +190,21 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     process = model.process
     beam_item = None
     beam_id = ""
-    guiref['process']['item_ids'] = []  # type : List[str]
 
+    # Place tree off screen for faster perfornance
+    # tree.place(x=5000,y=110)
+    guiref['process']['item_ids'] = []  # type : List[str]
+    seq_n = None
     for i, action in enumerate(process.actions):
         # Beam Row
-        if isinstance(action, LoadBeamAction):
-            beam_id = action.beam_id
+        if seq_n != action.seq_n:
+            seq_n = action.seq_n
+
+            beam_id = process.assembly.sequence[seq_n]
             beam_item = tree.insert(
-                parent="", index="end", iid=beam_id, text="Beam %s" % action.beam_id, open=True,
+                parent="", index="end", iid=beam_id, text="Beam %s" % beam_id, open=True,
                 values=("", "", "", "", "", "", beam_id))
-            guiref['process']['item_ids'].append(action.beam_id)
+            guiref['process']['item_ids'].append(beam_id)
         # Action Row
         description = action.__class__.__name__
         action_item = tree.insert(parent=beam_item, index="end", iid=action.tree_row_id, text="Action %i" % action.act_n,
@@ -217,6 +223,10 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
             if tree.selection() == ():
                 tree.selection_set(movement_item)
 
+    # Pack the tree back on screen after updating
+    # tree.pack(fill=tk.BOTH, expand=1, padx=6, pady=3, side=tk.LEFT)
+
+    # Make sure we sees the first selected row
     tree.see(tree.selection())
     logger_ui.info("Actions Treeview Updated")
 
@@ -345,6 +355,13 @@ def create_ui_execution(root, q: Queue):
         left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=20, state="disabled")
     ui_handles['step_button'].pack(side=tk.TOP)
 
+    def on_step_from_point_button_click(event=None):
+        logger_ui.info("Button Pressed: STEP FRON POINT")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP_FROM_POINT))
+    ui_handles['step_from_pt_button'] = tk.Button(
+        left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=20, state="disabled")
+    ui_handles['step_from_pt_button'].pack(side=tk.TOP)
+
     def on_stop_button_click(event=None):
         logger_ui.info("Button Pressed: STOP")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_STOP))
@@ -442,4 +459,21 @@ class SettingsPopupWindow(object):
 
     def cleanup(self):
         self.value = self.e.get('1.0', tk.END)
+        self.top.destroy()
+
+
+class AlternativeStartPointWindow(object):
+    def __init__(self, master, max_number):
+
+        top = self.top = tk.Toplevel(master)
+        self.l = tk.Label(top, text="Which point to start from? [0 to %i]" % max_number)
+        self.l.pack()
+        self.e = tk.Entry(top)
+        self.e.pack(side=tk.LEFT, fill=tk.BOTH)
+        self.b = tk.Button(top, text='Go', command=self.cleanup)
+        self.b.pack()
+        self.value = None
+
+    def cleanup(self):
+        self.value = int(self.e.get())
         self.top.destroy()

@@ -7,6 +7,7 @@ class BackgroundCommand(Enum):
 
     UI_RUN = auto()
     UI_STEP = auto()
+    UI_STEP_FROM_POINT = auto()
     UI_STOP = auto()
     UI_CONFIRM = auto()
     UI_UPDATE_STATUS = auto()
