@@ -55,6 +55,8 @@ class RobotClampExecutionModel(object):
         self.run_status: RunStatus = RunStatus.STOPPED
         self.run_thread: Thread = None
         self.ros_clamps: RemoteClampFunctionCall = None
+        self.ros_clamps_status = {}
+
         self.ros_robot: AbbClient = None
         self.operator_confirm = False
 
@@ -146,6 +148,11 @@ class RobotClampExecutionModel(object):
                         movement.softmove = True
                         logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
 
+                if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
+                    if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
+                        movement.softmove = True
+                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
+
 
 
     def settings_file_path_default(self):
@@ -175,19 +182,15 @@ class RobotClampExecutionModel(object):
                 movements_modified.append(movement)
         return movements_modified
 
-    def ros_clamps_callback(message, q=None):
+    def ros_clamps_callback(self, message, q=None):
         # ROS command comes from a separate thread.
         # To maintain single threaded access to the Radio / Clamp,
         # we convert the ROS Command to a BackgroundCommand and place it in background command queue
 
-        message_type = message['instruction_type']
-
         logger_ros.info("Ros Message Received: %s" % message)
-        if message_type == "CLAMPS_JAMMED":
-            sequence_id = message['sequence_id']
-            instructions = message['instruction_body']
-            q.put(SimpleNamespace(type=BackgroundCommand.EXE_CLAMPS_JAMMED,
-                                  clmap_pos_velo=instructions, sequence_id=sequence_id))
+        pass
+
+
 
     def connect_ros_clamps(self, ip, q):
         """Function to connect to ROS CLamps Client.
@@ -201,8 +204,7 @@ class RobotClampExecutionModel(object):
             except:
                 pass
 
-        self.ros_clamps = RemoteClampFunctionCall(
-            ip, status_change_callback=partial(self.ros_clamps_callback, q=q))
+        self.ros_clamps = RemoteClampFunctionCall(ip) # ros_clamps_callback disabled
         try:
             # This runs in a separate thread
             self.ros_clamps.run(timeout=2)

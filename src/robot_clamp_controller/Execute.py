@@ -331,7 +331,7 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
 
     INTERMEDIATE_ZONE = rrc.Zone.Z5
     FINAL_ZONE = rrc.Zone.FINE
-    STEPS_TO_BUFFER = 2  # Number of steps to allow in the robot buffer
+    STEPS_TO_BUFFER = 1  # Number of steps to allow in the robot buffer
 
     if movement.trajectory is None:
         logger_exe.warn("Attempt to execute movement with no trajectory")
@@ -341,34 +341,40 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
-    # Check soft move state and send softmove command is state is different.
-    # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
-    success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction="XYZ",
-                                        stiffness=99, stiffness_non_soft_dir=100)
-    if not success:
-        logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
-        return False
+    # # Check soft move state and send softmove command is state is different.
+    # # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
+    # success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction="XYZ",
+    #                                     stiffness=99, stiffness_non_soft_dir=100)
+    # if not success:
+    #     logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+    #     return False
 
+    # Ask user to press play on TP
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
+    model.ros_robot.send(rrc.Stop())
+    model.ros_robot.send_and_wait(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move begins']))
 
+    # Remove clamp prefix and send command
+    clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
+    velocity = model.settings[movement.speed_type]
+    position =  movement.jaw_positions[0]
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
+    clamp_action_finished = False
+
+    # Wait for clamp to ACK
+    while (True):
+        if model.ros_clamps.sent_messages_ack[sequence_id] == True:
+            logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
+            break
+
+    # Execute robot trajectory step by step
     for current_step, point in enumerate(movement.trajectory.points):
+        if current_step < active_point:
+            # insert a dummy future to fill the gap
+            futures.append(None)
+            continue
 
-        # Lopping while active_point is just 1 before the current_step.
-        while (True):
-            # Break the while loop and allow next point
-            if active_point >= current_step - STEPS_TO_BUFFER:
-                break
-            # Advance pointer when future is done
-            if futures[active_point].done:
-                logger_exe.debug("Point %i is done. Delta time %f seconds." %
-                                 (active_point, (datetime.datetime.now() - last_time).total_seconds()))
-                last_time = datetime.datetime.now()
-                active_point += 1
-            # Breaks entirely if model.run_status is STOPPED
-            if model.run_status == RunStatus.STOPPED:
-                logger_exe.warn("execute_robotic_free_movement stopped before completion (future not arrived)")
-                return False
-
-        # Format and send robot command
+        # Format movement and send robot command
         logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
         assert len(point.values) == 9
         j = to_degrees(point.values[3:10])
@@ -383,7 +389,44 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
         future = model.ros_robot.send(rrc.MoveToJoints(j, e, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
         futures.append(future)
 
-    return True
+        # Lopping while active_point is just STEPS_TO_BUFFER before the current_step.
+        while (True):
+            # Break the while loop and allow next point
+            if active_point >= current_step - STEPS_TO_BUFFER:
+                break
+
+            # Advance pointer when future is done
+            if futures[active_point].done:
+                # Compute Deviation
+                deviation = "?"
+                logger_exe.info("Point %i is done. Delta time %f seconds. Deviation is %s" %
+                                 (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
+                last_time = datetime.datetime.now()
+                active_point += 1
+
+            # Breaks entirely if model.run_status is STOPPED
+            if model.run_status == RunStatus.STOPPED:
+                model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
+                logger_exe.warn("execute_robotic_free_movement stopped before completion (future not arrived)")
+                return False
+
+            # Check if clamps are running or not
+
+            if (not clamp_action_finished) and (not model.ros_clamps.sync_move_inaction):
+                if model.ros_clamps.last_command_success:
+                    logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
+                    for clamp_id in clamp_ids:
+                        logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                else:
+                    # If clamp is jammed, stop the execution
+                    logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
+                    for clamp_id in clamp_ids:
+                        logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move Stopped because clamps jammed.']))
+                    return False
+
+                clamp_action_finished = True # What is left is for the robot to finish
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move Completed']))
     return True
 
 
@@ -392,20 +435,42 @@ def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: Clamps
         logger_exe.info(
             "Clamp movement cannot start because Clamp ROS is not connected")
         return False
+
     # Remove clamp prefix:
     clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
     velocity = model.settings[movement.speed_type]
-    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(
-        clamp_ids, movement.jaw_positions[0], velocity)
-    logger_exe.info("Clamp Jaw Movement Started: %s, seq_id = %s" %
-                    (movement, sequence_id))
+    position =  movement.jaw_positions[0]
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
+
+    # Wait for clamp to ACK
     while (True):
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
-            logger_exe.info("Clamp Jaw Movement completed")
-            return True
+            logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
+            break
+
+    model.ros_clamps.sync_move_inaction = True
+    model.ros_clamps.last_command_success = False
+    # Wait for clamp to complete
+    while (True):
+        # Check if clamps are running or not
+        if not model.ros_clamps.sync_move_inaction:
+            if model.ros_clamps.last_command_success:
+                logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
+                for clamp_id in clamp_ids:
+                    logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+
+                return True
+            else:
+                logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
+                for clamp_id in clamp_ids:
+                    logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                return False
+
+
+        # Check if user stopped the clampping process
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warn(
-                "Movement execution Stopped before sequence_id (%s) is confirmed." % sequence_id)
+                "Clamp Jaw Movement (%s) stopped before completion." % movement.movement_id)
             model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
             return False
 

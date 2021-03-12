@@ -194,6 +194,7 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     # Place tree off screen for faster perfornance
     # tree.place(x=5000,y=110)
     guiref['process']['item_ids'] = []  # type : List[str]
+    tree.delete(*tree.get_children())
     seq_n = None
     for i, action in enumerate(process.actions):
         # Beam Row
