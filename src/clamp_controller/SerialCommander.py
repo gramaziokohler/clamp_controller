@@ -28,7 +28,7 @@ class SerialCommander(object):
         self.status_update_high_freq: bool = False  # Flag that indicate update status interval to be in high frequency (when clamps are in motion)
         self.sync_move_inaction = False             # Flag to indicate sync move in action and monitor if any clamp stopped.
         self.sync_move_clamp_pos_velo_list = None # type: List[Tuple[ClampModel, float, float]]
-
+        self.last_command_success = False
         pass
 
     @property
@@ -198,7 +198,7 @@ class SerialCommander(object):
                 self.stop_clamps(processed_clamps)
                 return False
 
-        # Keep the status of this sync move for later monitoring 
+        # Keep the status of this sync move for later monitoring
         self.sync_move_inaction = True
         self.sync_move_clamp_pos_velo_list = clamp_pos_velo_list
         # If nothing went wrong, this is a success
@@ -248,7 +248,7 @@ class SerialCommander(object):
 
     def stop_clamps(self, clamps: List[ClampModel]) -> List[bool]:
         """Stop multiple clamps
-        """ 
+        """
         successes = []
         for clamp in clamps:
             response = self.message_clamp(clamp, "s")

@@ -1,6 +1,6 @@
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.SerialCommander import SerialCommander
-from roslibpy import Ros
+from clamp_controller.RosClampCommandListener import RosClampCommandListener
 
 # SerialCommanderTokyo is a SErialCommander that contains the initialization of the clamps
 # used in the Tokyo project.
@@ -29,5 +29,5 @@ class SerialCommanderFred(SerialCommander):
         self.add_clamp(self.clamp3)
         self.add_clamp(self.clamp4)
 
-        self.ros_client: Ros = None
+        self.ros_client: RosClampCommandListener = None
         self.status_update_interval_low_ms = 950

@@ -45,6 +45,8 @@ def background_thread(guiref, commander: SerialCommanderFred, q):
         if update_status(guiref, commander):
             # Check sync move if there is a new status update.
             check_sync_move(guiref, commander)
+            # Send ros statud update
+            send_status_update_to_ros(commander)
             continue
     logging.getLogger("app.bg").info("Background Thread Stopped")
 
@@ -174,9 +176,13 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                     logger_ctr.warning("ROS_VEL_GOTO_COMMAND has no instructions")
                     return True
 
+                # Keep track if the command is completed successful.
+                # This will be set back to true by the sync watcher
+                commander.last_command_success = False
+
                 # Replace the clamp_id with the retrived ClampModel
                 clamp_pos_velo_list = [(commander.clamps[clamp_id], position, velocity) for clamp_id, position, velocity in instructions]
-                
+
                 # Instruct commander to send command
                 success = commander.sync_clamps_move(clamp_pos_velo_list)
 
@@ -210,7 +216,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
 
 def update_status(guiref, commander: SerialCommanderFred):
     """Regularly calling the commander to poll clamps for a status.
-    Updates the GUI labels upon a successful poll. ALso updates the last communicated time if unsuccessful. 
+    Updates the GUI labels upon a successful poll. ALso updates the last communicated time if unsuccessful.
     """
     global last_status_update_time
     if ((commander.serial_port is None) or (not commander.serial_port.isOpen())):
@@ -240,7 +246,7 @@ def update_status(guiref, commander: SerialCommanderFred):
             if clamp.currentJawPosition is not None:
                 guiref['status'][clamp.receiver_address]['position'].set("%04.1fmm" % clamp.currentJawPosition)
             # Step Error with orange Label > abs(100 steps)
-            if clamp._raw_currentPosition is not None:    
+            if clamp._raw_currentPosition is not None:
                 guiref['status'][clamp.receiver_address]['error'].set("%3i steps" % int(clamp._raw_currentPosition - clamp._raw_currentTarget))
                 guiref['status'][clamp.receiver_address]['power_label'].config(fg = "orange" if abs(clamp._raw_currentPosition - clamp._raw_currentTarget) > 100 else "black")
             # Motor Power percentage with Orange Label > 90%
@@ -253,7 +259,7 @@ def update_status(guiref, commander: SerialCommanderFred):
                 guiref['status'][clamp.receiver_address]['battery'].set("%2i%%" % clamp.batteryPercentage)
                 guiref['status'][clamp.receiver_address]['battery_label'].config(fg = "red" if clamp.batteryPercentage < 10 else "black")
 
-            # Clamp Last Communicate Time with Read Label > 500ms 
+            # Clamp Last Communicate Time with Read Label > 500ms
             if clamp._state_timestamp is not None:
                 guiref['status'][clamp.receiver_address]['last_com'].set("%2dms" % (current_milli_time() - clamp._state_timestamp))
                 guiref['status'][clamp.receiver_address]['last_com_label'].config(fg = "red" if (current_milli_time() - clamp._state_timestamp) > 500 else "black")
@@ -265,6 +271,7 @@ def update_status(guiref, commander: SerialCommanderFred):
     else:
         return False
 
+
 def check_sync_move(guiref, commander: SerialCommanderFred, target_reach_threshold = 0.5):
     """ Perhaps a checks if the commander.sync_move_inaction flag is True.
     This function checks all the clamps in commander.sync_move_clamp_pos_velo_list
@@ -272,7 +279,7 @@ def check_sync_move(guiref, commander: SerialCommanderFred, target_reach_thresho
     - If any clamp in the list have not reached its target (within threshold) and have stopped moveing.
     - Maybe other checkes will be added in the future.
     This function will request the commander to stop all clamps involved.
-    """ 
+    """
     if commander.sync_move_inaction:
         for clamp, target_jaw_position, velo in commander.sync_move_clamp_pos_velo_list:
             # Check every clamp that should be moving
@@ -285,15 +292,31 @@ def check_sync_move(guiref, commander: SerialCommanderFred, target_reach_thresho
                     if not all (successes):
                         successes = commander.stop_clamps([c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp])
                 commander.sync_move_inaction = False
+                commander.last_command_success = False
+                return False
         # Cancels the flag if all clamps reached target or stopped.
         if not any([c.isMotorRunning for c, _, _ in commander.sync_move_clamp_pos_velo_list]):
             commander.sync_move_inaction = False
             logger_sync.info("Sync Move Check Completed. All clamps stopped. Flag is reset. Details:")
             for clamp, target_jaw_position, _ in commander.sync_move_clamp_pos_velo_list:
                 logger_sync.info("Sync Move - %s current_pos = %0.1fmm (target = %0.1fmm)" % (clamp, clamp.currentJawPosition, target_jaw_position))
+            commander.last_command_success = True
         return True
     else:
         return False
+
+
+def send_status_update_to_ros(commander: SerialCommanderFred):
+    if commander.ros_client is not None:
+
+        status = {}
+        for clamp_id, clamp in commander.clamps.items():
+            status[clamp_id] = clamp.state_to_data
+        data = {}
+        data['status'] = status
+        data['last_command_success'] = commander.last_command_success
+        data['sync_move_inaction'] = commander.sync_move_inaction
+        commander.ros_client.send_status(data)
 
 
 def initialize_logging(filename: str):
@@ -343,7 +366,7 @@ if __name__ == "__main__":
     # Root TK Object
     root = tk.Tk()
     root.title("Tokyo Clamps Commander")
-    root.geometry("1500x400")
+    root.geometry("1500x500")
     # Command queue
     q = queue.Queue()
     # Create Model

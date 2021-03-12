@@ -41,12 +41,26 @@ class RosClampCommandListener(Ros):
         self.listener = roslibpy.Topic(self, '/clamp_command', 'std_msgs/String')
         self.listener.subscribe(receive_callback)
 
+        self.status_publisher = roslibpy.Topic(self, '/clamp_status', 'std_msgs/String')
+        self.status_publisher.advertise()
+
     def reply_ack_result(self, sequence_id, ack_result):
         reply_message = {'msg':' Clamps Ack result.' }
         reply_message['sequence_id'] = sequence_id
         reply_message['timestamp'] = current_milli_time()
         reply_message['ack'] = ack_result
         self.replier.publish(roslibpy.Message({'data': json.dumps(reply_message)}))
+
+    def send_status(self, data: dict):
+        """ Sends a ROS command to /clamp_command channel and returns the sequence_id of sent message
+        instruction_type: str
+        instruction_body; str
+        """
+        # Create message to send
+        data['timestamp'] = current_milli_time()
+
+        self.status_publisher.publish(roslibpy.Message({'data' : json.dumps(data)}))
+        print("Sent Status Update to ros /clamp_status")
 
 # Directly calling this script creates a listener that will print out messages.
 # It will also show the one way trip time.
