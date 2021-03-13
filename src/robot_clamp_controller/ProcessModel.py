@@ -40,20 +40,21 @@ class RunStatus(Enum):
 class RobotClampExecutionModel(object):
 
     def __init__(self):
+        ##################
+        # Process File
+        ##################
         self.process: RobotClampAssemblyProcess = None
         self.process_path = ""
 
         # Ordered Dict for easy accessing the movements via move_id
         self.movements = OrderedDict()
 
-        self.status_update_interval_high_ms: int = 150  # ms
-        self.status_update_interval_low_ms: int = 2000  # ms
-
         self.logger = logging.getLogger("app.mdl")
 
-        # Flag to indicate if an movement is active
-        self.run_status: RunStatus = RunStatus.STOPPED
-        self.run_thread: Thread = None
+        ####################################
+        # ROS Robot and Clamp Connections
+        ####################################
+
         self.ros_clamps: RemoteClampFunctionCall = None
         self.ros_clamps_status = {}
 
@@ -63,6 +64,13 @@ class RobotClampExecutionModel(object):
         # Robot states
         self.ros_robot_state_softmove_enabled = None
 
+        #################
+        # Execution
+        #################
+
+        # Flag to indicate if an movement is active
+        self.run_status: RunStatus = RunStatus.STOPPED
+        self.run_thread: Thread = None
 
         # Pointer to the currently selected action
         self.current_action: Action = None
@@ -131,7 +139,6 @@ class RobotClampExecutionModel(object):
                 movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
                 self.movements[movement.tree_row_id] = movement
 
-
     def _mark_movements_as_softmove(self):
         # type: () -> None
         """Marks the final movements of the assembly process as soft move."""
@@ -142,18 +149,16 @@ class RobotClampExecutionModel(object):
                 movement.softmove = False
                 # Softmove cases
                 if isinstance(movement, RoboticClampSyncLinearMovement) and movement.speed_type == 'speed.assembly.clamping':
-                        movement.softmove = True
-                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
+                    movement.softmove = True
+                    logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
                 if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
-                        movement.softmove = True
-                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
+                    movement.softmove = True
+                    logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
 
                 if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
                     if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
                         movement.softmove = True
                         logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
-
-
 
     def settings_file_path_default(self):
         return os.path.join(tempfile.gettempdir(), "itj_process_execution_setting.json")
@@ -182,17 +187,7 @@ class RobotClampExecutionModel(object):
                 movements_modified.append(movement)
         return movements_modified
 
-    def ros_clamps_callback(self, message, q=None):
-        # ROS command comes from a separate thread.
-        # To maintain single threaded access to the Radio / Clamp,
-        # we convert the ROS Command to a BackgroundCommand and place it in background command queue
-
-        logger_ros.info("Ros Message Received: %s" % message)
-        pass
-
-
-
-    def connect_ros_clamps(self, ip, q):
+    def connect_ros_clamps(self, ip, status_change_callback=None):
         """Function to connect to ROS CLamps Client.
         Returns True on successful connection"""
 
@@ -204,17 +199,18 @@ class RobotClampExecutionModel(object):
             except:
                 pass
 
-        self.ros_clamps = RemoteClampFunctionCall(ip) # ros_clamps_callback disabled
+        self.ros_clamps = RemoteClampFunctionCall(ip, status_change_callback=status_change_callback)  # ros_clamps_callback disabled
         try:
             # This runs in a separate thread
             self.ros_clamps.run(timeout=2)
             time.sleep(0.5)
-            logger_model.info("Clamps ROS host connected")
+            logger_model.info("Clamps ROS host connected. ip= %s" % ip)
             return True
         except:
+            logger_model.info("Failed to connect to Clamps ROS host. ip= %s" % ip)
+
             self.ros_clamps = None
             return False
-            pass
 
     def connect_ros_robots(self, ip, q):
         """Function to connect to ROS CLamps Client.

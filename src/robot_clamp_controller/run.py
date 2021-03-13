@@ -51,20 +51,203 @@ def background_thread(guiref, model: RobotClampExecutionModel, q):
     Task must return True if it was executed and return False if it was not executed."""
     logger_bg.info("Background Thread Started")
     while True:
-        if handle_background_commands(guiref, model, q):
+        if execute_background_commands(guiref, model, q):
             continue
     logger_bg.info("Background Thread Stopped")
 
 
-def on_background_command_arrival_check(
-    msg, guiref,
-    model: RobotClampExecutionModel,
-    target_bg_command: BackgroundCommand,
-    check_loaded_process=False,
-    check_robot_connection=False,
-    check_status_is_stopped=False,
-    check_selected_is_movement=False
-    ):
+def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
+    try:
+        msg = None
+        msg = q.get(timeout=0.1)
+        if hasattr(msg, 'type'):
+
+            # Handelling MODEL_LOAD_PROCESS upon closure of dialog
+            if msg.type == BackgroundCommand.MODEL_LOAD_PROCESS:
+                logger_bg.info(
+                    "Relaying BackgroundCommand: MODEL_LOAD_PROCESS")
+                guiref['root'].wm_state('iconic')
+                disable_run_buttons(guiref)
+                model.load_process(msg.json_path)
+                if model is not None:
+                    guiref['process']['process_status'].set(
+                        model.process_description)
+                init_actions_tree_view(guiref, model)
+                enable_run_buttons(guiref)
+                guiref['root'].wm_state('zoomed')
+
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_OPEN_SETTING):
+                # model.open_setting_file()
+                path = model.settings_file_path_default()
+                master = guiref['root']
+                popup = SettingsPopupWindow(master, path)
+                master.wait_window(popup.top)
+                if hasattr(popup, 'value'):
+                    with open(path, 'w') as f:
+                        f.write(popup.value)
+                    model.load_settings()
+                    logger_bg.info("Settings Saved")
+
+            # Handle UI_UPDATE_STATUS
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_UPDATE_STATUS):
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_RUN
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_RUN,
+                            check_loaded_process=True, check_robot_connection=True):
+                # Change Status
+                model.run_status = RunStatus.RUNNING
+                # Start a new thread if the current one is not active
+                if model.run_thread is None or not model.run_thread.isAlive():
+                    model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.start()
+                ui_update_run_status(guiref, model)
+                # Dont do anyhting if program is already running
+
+            # Handelling UI_STEP
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STEP,
+                            check_loaded_process=True, check_robot_connection=True):
+                # Change Status
+                model.run_status = RunStatus.STEPPING_FORWARD
+                # Start a new thread if the current one is not active
+                if model.run_thread is None or not model.run_thread.isAlive():
+                    model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.start()
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_STEP_FROM_POINT
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STEP_FROM_POINT,
+                            check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
+                # Change Status
+                model.run_status = RunStatus.STEPPING_FORWARD_FROM_PT
+
+                # Retrive movement and check if state is available
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                max_start_number = len(movement.trajectory.points) - 1
+                popup = AlternativeStartPointWindow(guiref['root'], max_start_number)
+                guiref['root'].wait_window(popup.top)
+                n = popup.value
+                if n > max_start_number:
+                    logger_bg.warm("Input number larger than number of trajectory points")
+                    return True
+
+                model.alternative_start_point = n
+                # Start a new thread if the current one is not active
+                if model.run_thread is None or not model.run_thread.isAlive():
+                    model.run_thread = Thread(
+                        target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.start()
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_STOP
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STOP):
+                model.run_status = RunStatus.STOPPED
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_CONFIRM
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_CONFIRM):
+                model.operator_confirm = True
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_ROBOT_CONNECT
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_ROBOT_CONNECT):
+                # Connect to new ROS host
+                guiref['ros']['robot_status'].set("Connecting to Robot Host")
+                if model.connect_ros_robots(msg.ip, q):
+                    guiref['ros']['robot_status'].set(
+                        "Connected to Robot Host")
+                    logger_ctr.info("Robot Host Connected")
+                else:
+                    guiref['ros']['robot_status'].set("Not Connected")
+                    logger_ctr.info("Robot Host connection not successful")
+
+            # Handelling UI_CLAMP_CONNECT
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_CLAMP_CONNECT):
+                # Connect to new ROS host
+                guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
+                if model.connect_ros_clamps(msg.ip, q):
+                    guiref['ros']['clamp_status'].set(
+                        "Connected to Clamp Host")
+                    logger_ctr.info("Clamp Host Connected")
+                else:
+                    guiref['ros']['clamp_status'].set("Not Connected")
+                    logger_ctr.info("Clamp Host connection not successful")
+
+            # Handelling PRINT_ACTION_SUMMARY
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.PRINT_ACTION_SUMMARY):
+                beam_id = treeview_get_selected_item_beam_id(guiref)
+                if beam_id is not None:
+                    model.process.get_movement_summary_by_beam_id(beam_id)
+
+            # Handelling UI_LOAD_EXT_MOVEMENT
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_LOAD_EXT_MOVEMENT, check_loaded_process=True):
+                movements_modified = model.load_external_movements()
+                for movement in movements_modified:
+                    update_treeview_row(guiref, model, movement)
+
+            # Handelling UI_GOTO_START_STATE
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_START_STATE,
+                            check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
+                # Retrive movement and check if state is available
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                if not model.process.movement_has_start_robot_config(movement):
+                    logger_bg.warn(
+                        "Selected item does not have a START robot config")
+                    return False
+
+                # Construct and send rrc command
+                state = model.process.get_movement_start_state(movement)
+                success = execute_jog_robot_to_state(
+                    model, state, message="Jogging to START State of %s " % movement.movement_id)
+                if not success:
+                    model.run_status = RunStatus.ERROR
+                else:
+                    model.run_status = RunStatus.STOPPED
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_GOTO_END_STATE
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
+                            check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
+                # Retrive movement and check if state is available
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                if not model.process.movement_has_end_robot_config(movement):
+                    logger_bg.warn(
+                        "Selected item does not have an END robot config")
+                    return False
+
+                # Construct and send rrc command
+                state = model.process.get_movement_end_state(movement)
+                success = execute_jog_robot_to_state(
+                    model, state, message="Jogging to END State of %s " % movement.movement_id)
+                if not success:
+                    model.run_status = RunStatus.ERROR
+                else:
+                    model.run_status = RunStatus.STOPPED
+                ui_update_run_status(guiref, model)
+
+            # Handelling UI_SOFTMODE_ENABLE
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
+                robot_softmove(model, True, "XYZ", 20, 50)
+
+            # Handelling UI_SOFTMODE_DISABLE
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE, check_robot_connection=True, check_status_is_stopped=True):
+                robot_softmove(model, False)
+
+            # Returns True if a command is consumed
+            return True
+    except queue.Empty:
+        return False
+
+
+def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
+        target_bg_command: BackgroundCommand,
+        check_loaded_process=False,
+        check_robot_connection=False,
+        check_status_is_stopped=False,
+        check_selected_is_movement=False):
     if msg.type != target_bg_command:
         return False
     if check_loaded_process:
@@ -89,217 +272,6 @@ def on_background_command_arrival_check(
     # Return True if every check is passed
     logger_bg.info("Processing BG Command: %s" % target_bg_command)
     return True
-
-
-def handle_background_commands(guiref, model: RobotClampExecutionModel, q):
-    try:
-        msg = None
-        msg = q.get(timeout=0.1)
-        if hasattr(msg, 'type'):
-
-            # Handelling MODEL_LOAD_PROCESS upon closure of dialog
-            if msg.type == BackgroundCommand.MODEL_LOAD_PROCESS:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: MODEL_LOAD_PROCESS")
-                guiref['root'].wm_state('iconic')
-                disable_run_buttons(guiref)
-                model.load_process(msg.json_path)
-                if model is not None:
-                    guiref['process']['process_status'].set(
-                        model.process_description)
-                init_actions_tree_view(guiref, model)
-                enable_run_buttons(guiref)
-                guiref['root'].wm_state('zoomed')
-
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_OPEN_SETTING):
-                # model.open_setting_file()
-                path = model.settings_file_path_default()
-                master = guiref['root']
-                popup = SettingsPopupWindow(master, path)
-                master.wait_window(popup.top)
-                if hasattr(popup, 'value'):
-                    with open(path, 'w') as f:
-                        f.write(popup.value)
-                    model.load_settings()
-                    logger_bg.info("Settings Saved")
-
-            # Handle UI_UPDATE_STATUS
-            if msg.type == BackgroundCommand.UI_UPDATE_STATUS:
-                logger_bg.info(
-                    "ui_update_run_status")
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_RUN
-            if msg.type == BackgroundCommand.UI_RUN:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_RUN, Starting new RUN thread.")
-                if model.process is None:
-                    logger_bg.info("Load Process first")
-                elif not model.run_status == RunStatus.RUNNING:
-                    model.run_status = RunStatus.RUNNING
-                    model.run_thread = Thread(
-                        target=program_run_thread, args=(guiref, model, q), daemon=True)
-                    model.run_thread.start()
-                    ui_update_run_status(guiref, model)
-                # Dont do anyhting if program is already running
-
-            # Handelling UI_STEP
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_STEP,
-                        check_loaded_process=True, check_robot_connection=True, ):
-                # Change Status
-                model.run_status = RunStatus.STEPPING_FORWARD
-                # Start a new thread if the current one is not active
-                if model.run_thread is None or not model.run_thread.isAlive():
-                    model.run_thread = Thread(
-                        target=program_run_thread, args=(guiref, model, q), daemon=True)
-                    model.run_thread.start()
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_STEP_FROM_POINT
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_STEP_FROM_POINT,
-                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
-                    # Change Status
-                    model.run_status = RunStatus.STEPPING_FORWARD_FROM_PT
-
-                    # Retrive movement and check if state is available
-                    tree_row_id = treeview_get_selected_id(guiref)
-                    movement = model.movements[tree_row_id]
-                    max_start_number = len(movement.trajectory.points) - 1
-                    popup = AlternativeStartPointWindow(guiref['root'], max_start_number)
-                    guiref['root'].wait_window(popup.top)
-                    n = popup.value
-                    if n > max_start_number:
-                        logger_bg.warm("Input number larger than number of trajectory points")
-                        return True
-
-                    model.alternative_start_point = n
-                    # Start a new thread if the current one is not active
-                    if model.run_thread is None or not model.run_thread.isAlive():
-                        model.run_thread = Thread(
-                            target=program_run_thread, args=(guiref, model, q), daemon=True)
-                        model.run_thread.start()
-                    ui_update_run_status(guiref, model)
-
-            # Handelling UI_STOP
-            if msg.type == BackgroundCommand.UI_STOP:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_STOP. Stopping RUN THREAD")
-                model.run_status = RunStatus.STOPPED
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_CONFIRM
-            if msg.type == BackgroundCommand.UI_CONFIRM:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_CONFIRM.")
-                model.operator_confirm = True
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_ROBOT_CONNECT
-            if msg.type == BackgroundCommand.UI_ROBOT_CONNECT:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_ROS_CONNECT - msg.ip = %s" % msg.ip)
-
-                # Connect to new ROS host
-                guiref['ros']['robot_status'].set("Connecting to Robot Host")
-                if model.connect_ros_robots(msg.ip, q):
-                    guiref['ros']['robot_status'].set(
-                        "Connected to Robot Host")
-                    logger_ctr.info("Robot Host Connected")
-                else:
-                    guiref['ros']['robot_status'].set("Not Connected")
-                    logger_ctr.info("Robot Host connection not successful")
-
-            # Handelling UI_CLAMP_CONNECT
-            if msg.type == BackgroundCommand.UI_CLAMP_CONNECT:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_CLAMP_CONNECT - msg.ip = %s" % msg.ip)
-
-                # Connect to new ROS host
-                guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
-                if model.connect_ros_clamps(msg.ip, q):
-                    guiref['ros']['clamp_status'].set(
-                        "Connected to Clamp Hose")
-                    logger_ctr.info("Clamp Host Connected")
-                else:
-                    guiref['ros']['clamp_status'].set("Not Connected")
-                    logger_ctr.info("Clamp Host connection not successful")
-
-            # Handelling PRINT_ACTION_SUMMARY
-            if msg.type == BackgroundCommand.PRINT_ACTION_SUMMARY:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: PRINT_ACTION_SUMMARY.")
-                beam_id = treeview_get_selected_item_beam_id(guiref)
-                if beam_id is not None:
-                    model.process.get_movement_summary_by_beam_id(beam_id)
-
-            # Handelling UI_LOAD_EXT_MOVEMENT
-            if msg.type == BackgroundCommand.UI_LOAD_EXT_MOVEMENT:
-                logger_bg.info(
-                    "Relaying BackgroundCommand: UI_LOAD_EXT_MOVEMENT.")
-                if model.process is None:
-                    logger_bg.info("Load Process first.")
-                movements_modified = model.load_external_movements()
-                for movement in movements_modified:
-                    update_treeview_row(guiref, model, movement)
-
-            # Handelling UI_GOTO_START_STATE
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_GOTO_START_STATE,
-                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
-                # Retrive movement and check if state is available
-                tree_row_id = treeview_get_selected_id(guiref)
-                movement = model.movements[tree_row_id]
-                if not model.process.movement_has_start_robot_config(movement):
-                    logger_bg.warn(
-                        "Selected item does not have a START robot config")
-                    return False
-
-                # Construct and send rrc command
-                state = model.process.get_movement_start_state(movement)
-                success = execute_jog_robot_to_state(
-                    model, state, message="Jogging to START State of %s " % movement.movement_id)
-                if not success:
-                    model.run_status = RunStatus.ERROR
-                else:
-                    model.run_status = RunStatus.STOPPED
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_GOTO_END_STATE
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
-                                                   check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
-                # Retrive movement and check if state is available
-                tree_row_id = treeview_get_selected_id(guiref)
-                movement = model.movements[tree_row_id]
-                if not model.process.movement_has_end_robot_config(movement):
-                    logger_bg.warn(
-                        "Selected item does not have an END robot config")
-                    return False
-
-                # Construct and send rrc command
-                state = model.process.get_movement_end_state(movement)
-                success = execute_jog_robot_to_state(
-                    model, state, message="Jogging to END State of %s " % movement.movement_id)
-                if not success:
-                    model.run_status = RunStatus.ERROR
-                else:
-                    model.run_status = RunStatus.STOPPED
-                ui_update_run_status(guiref, model)
-
-            # Handelling UI_SOFTMODE_ENABLE
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE,
-                                                check_robot_connection=True, check_status_is_stopped=True):
-                # Softmode on
-                robot_softmove(model, True, "XYZ", 20, 50)
-
-            # Handelling UI_SOFTMODE_DISABLE
-            if on_background_command_arrival_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE,
-                                                check_robot_connection=True, check_status_is_stopped=True):
-                # Softmode off
-                robot_softmove(model, False)
-
-            # Returns True if a command is consumed
-            return True
-    except queue.Empty:
-        return False
 
 
 def robot_goto_end_frame(guiref, model: RobotClampExecutionModel, q):
@@ -394,7 +366,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         treeview_select_next_movement(guiref)
 
         # Stop execution if it is currently in STEPPING mode.
-        if model.run_status == RunStatus.STEPPING_FORWARD or model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT :
+        if model.run_status == RunStatus.STEPPING_FORWARD or model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
             model.run_status = RunStatus.STOPPED
 
         # Status note that the RUN Thread is Stopped
@@ -424,6 +396,14 @@ def initialize_logging(filename: str):
     logger.addHandler(log_console_handler)
     logger.info("App Started")
 
+
+def ros_clamps_callback(self, message, q=None):
+    # ROS command comes from a separate thread.
+    # To maintain single threaded access to the Radio / Clamp,
+    # we convert the ROS Command to a BackgroundCommand and place it in background command queue
+
+    logger_ros.info("Ros Message Received: %s" % message)
+    pass
 
 if __name__ == "__main__":
 

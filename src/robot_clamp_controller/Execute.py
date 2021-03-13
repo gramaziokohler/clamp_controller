@@ -11,16 +11,16 @@ import datetime
 logger_exe = logging.getLogger("app.exe")
 
 # Tool data settings in Robot Studio:
-    # TASK PERS tooldata t_A067_Tool:=[TRUE,[[0,0,0],[1,0,0,0]],[2.12,[0,0,45],[1,0,0,0],0,0,0]];
-    # TASK PERS tooldata t_A067_Tool_PG1000:=[TRUE,[[0,0,0],[1,0,0,0]],[10.72,[0,0,105],[1,0,0,0],0,0,0]];
-    # TASK PERS tooldata t_A067_Tool_PG500:=[TRUE,[[0,0,0],[1,0,0,0]],[9.04,[0,0,110],[1,0,0,0],0,0,0]];
-    # TASK PERS tooldata t_A067_Tool_CL3:=[TRUE,[[0,0,0],[1,0,0,0]],[7.99,[-30,4,73],[1,0,0,0],0,0,0]];
+# TASK PERS tooldata t_A067_Tool:=[TRUE,[[0,0,0],[1,0,0,0]],[2.12,[0,0,45],[1,0,0,0],0,0,0]];
+# TASK PERS tooldata t_A067_Tool_PG1000:=[TRUE,[[0,0,0],[1,0,0,0]],[10.72,[0,0,105],[1,0,0,0],0,0,0]];
+# TASK PERS tooldata t_A067_Tool_PG500:=[TRUE,[[0,0,0],[1,0,0,0]],[9.04,[0,0,110],[1,0,0,0],0,0,0]];
+# TASK PERS tooldata t_A067_Tool_CL3:=[TRUE,[[0,0,0],[1,0,0,0]],[7.99,[-30,4,73],[1,0,0,0],0,0,0]];
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
 
-def execute_movement(model: RobotClampExecutionModel, movement: Movement):
+def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement):
     """Return True if the movement is executed to completion without problem.
 
     This is a blocking call that returns only if a movement is completed
@@ -28,6 +28,8 @@ def execute_movement(model: RobotClampExecutionModel, movement: Movement):
 
     logger_exe.info("Executing Movement (%s): %s" % (movement.movement_id, movement.tag))
     logger_exe.info(" - %s" % movement)
+
+    guiref['exe']['last_executed_movement'].set(movement.movement_id)
 
     model.ros_robot.send(rrc.CustomInstruction(
         'r_A067_TPPlot', ["Executing Movement (%s)" % (movement.movement_id)], []))
@@ -40,19 +42,19 @@ def execute_movement(model: RobotClampExecutionModel, movement: Movement):
         return True
 
     elif isinstance(movement, RoboticClampSyncLinearMovement):
-        return execute_robotic_clamp_sync_linear_movement(model, movement)
+        return execute_robotic_clamp_sync_linear_movement(guiref, model, movement)
 
     elif isinstance(movement, RoboticFreeMovement):
-        return execute_robotic_free_movement(model, movement)
+        return execute_robotic_free_movement(guiref, model, movement)
 
     elif isinstance(movement, RoboticLinearMovement):
-        return execute_robotic_linaer_movement(model, movement)
+        return execute_robotic_linaer_movement(guiref, model, movement)
 
     elif isinstance(movement, ClampsJawMovement):
-        return execute_clamp_jaw_movement(model, movement)
+        return execute_clamp_jaw_movement(guiref, model, movement)
 
     elif isinstance(movement, RoboticDigitalOutput):
-        return execute_robotic_digital_output(model, movement)
+        return execute_robotic_digital_output(guiref, model, movement)
 
     # Catch all during Development
     else:
@@ -67,11 +69,11 @@ def grip_load_instruction_from_beam(model: RobotClampExecutionModel, beam_id: st
     beam = model.process.assembly.beam(beam_id)
 
     # rough eastimate of beam weight
-    beam_volume = beam.width * beam.length * beam.height # mm
-    beam_density = 460 # kg/m^3
+    beam_volume = beam.width * beam.length * beam.height  # mm
+    beam_density = 460  # kg/m^3
     beam_weight = beam_density * beam_volume * 1e-9
 
-    #Estimate of beam cog
+    # Estimate of beam cog
     gripper_grasp_dist_from_start = model.process.assembly.get_beam_attribute(beam_id, "gripper_grasp_dist_from_start")
     beam_grasp_offset = beam.length / 2 - gripper_grasp_dist_from_start
 
@@ -100,9 +102,10 @@ def grip_load_instruction_from_beam(model: RobotClampExecutionModel, beam_id: st
     inertia_y = 0
     inertia_z = 0
     logger_exe.info("Grip Load generated for beam %s, beam_weight = %skg, beam_grasp_offset = %smm" % (beam_id, beam_weight, beam_grasp_offset))
-    return rrc.CustomInstruction('r_A067_GripLoad',[], [mass, cog_x, cog_y, cog_z, aom_q1, aom_q2, aom_q3, aom_q4, inertia_x, inertia_y, inertia_z], feedback_level=rrc.FeedbackLevel.DONE)
+    return rrc.CustomInstruction('r_A067_GripLoad', [], [mass, cog_x, cog_y, cog_z, aom_q1, aom_q2, aom_q3, aom_q4, inertia_x, inertia_y, inertia_z], feedback_level=rrc.FeedbackLevel.DONE)
 
-def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
+
+def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
     """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
 
     This functions blocks and waits for the completion. For example if operator did not
@@ -123,7 +126,7 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
 
         # Set Grip Load to zero
         future_results.append(model.ros_robot.send(
-            rrc.CustomInstruction('r_A067_GripUnload',[],[], feedback_level=rrc.FeedbackLevel.DONE)))
+            rrc.CustomInstruction('r_A067_GripUnload', [], [], feedback_level=rrc.FeedbackLevel.DONE)))
         logger_exe.info("Gripper opening, grip load set to zero.")
 
     # Close Gripper Valve
@@ -138,13 +141,13 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
         if movement.beam_id is not None:
             future_results.append(model.ros_robot.send(
                 grip_load_instruction_from_beam(model, movement.beam_id)))
-            logger_exe.info("Closing Gripper %s on beam %s (new load set)"% ( movement.tool_id, movement.beam_id))
+            logger_exe.info("Closing Gripper %s on beam %s (new load set)" % (movement.tool_id, movement.beam_id))
 
     # Lock Tool Valve
     if movement.digital_output == DigitalOutput.LockTool:
         # Set tool data
         tool_data_name = 't_A067_Tool_' + model.process.tool(movement.tool_id).type_name
-        logger_exe.info("Locking to tool %s (new tooldata = %s)"% ( movement.tool_id, tool_data_name))
+        logger_exe.info("Locking to tool %s (new tooldata = %s)" % (movement.tool_id, tool_data_name))
 
         future_results.append(model.ros_robot.send(
             rrc.SetTool(tool_data_name, feedback_level=rrc.FeedbackLevel.DONE)))
@@ -169,11 +172,11 @@ def execute_robotic_digital_output(model: RobotClampExecutionModel, movement: Ro
 
         # Set grip data to `zero` and tool data to `no tool`
         future_results.append(model.ros_robot.send(
-            rrc.CustomInstruction('r_A067_GripUnload',[],[], feedback_level=rrc.FeedbackLevel.DONE)))
+            rrc.CustomInstruction('r_A067_GripUnload', [], [], feedback_level=rrc.FeedbackLevel.DONE)))
         tool_data_name = 't_A067_Tool'
         future_results.append(model.ros_robot.send(
             rrc.SetTool(tool_data_name, feedback_level=rrc.FeedbackLevel.DONE)))
-        logger_exe.info("Unlocking tool %s (new tooldata = %s)"% ( movement.tool_id, tool_data_name))
+        logger_exe.info("Unlocking tool %s (new tooldata = %s)" % (movement.tool_id, tool_data_name))
 
     # Add some delay after the action
     future_results.append(model.ros_robot.send(rrc.WaitTime(2, feedback_level=1)))
@@ -224,7 +227,7 @@ def execute_jog_robot_to_state(model, robot_state: Configuration, message: str =
             return False
 
 
-def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: RoboticFreeMovement):
+def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movement: RoboticFreeMovement):
     """Performs RoboticFreeMovement Movement by setting the robot's IO signals
 
     This functions blocks and waits for the completion. For example if operator did not
@@ -254,7 +257,7 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     # Check soft move state and send softmove command is state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction="XYZ",
-                                stiffness=99, stiffness_non_soft_dir=100)
+                                      stiffness=99, stiffness_non_soft_dir=100)
     if not success:
         logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
         return False
@@ -263,6 +266,9 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
         active_point = model.alternative_start_point
 
+
+    guiref['exe']['last_completed_trajectory_point'].set(" - ")
+    guiref['exe']['last_deviation'].set(" - ")
     for current_step, point in enumerate(movement.trajectory.points):
         # Skip points in the case of a halfway start
         if current_step < active_point:
@@ -295,8 +301,10 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
                 # Compute Deviation
                 deviation = "?"
                 logger_exe.info("Point %i is done. Delta time %f seconds. Deviation is %s" %
-                                 (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
+                                (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
                 last_time = datetime.datetime.now()
+                guiref['exe']['last_completed_trajectory_point'].set(str(active_point))
+                guiref['exe']['last_deviation'].set(str(deviation))
                 active_point += 1
             # Breaks entirely if model.run_status is STOPPED
             if model.run_status == RunStatus.STOPPED:
@@ -312,12 +320,12 @@ def execute_robotic_free_movement(model: RobotClampExecutionModel, movement: Rob
     return True
 
 
-def execute_robotic_linaer_movement(model: RobotClampExecutionModel, movement: RoboticLinearMovement):
+def execute_robotic_linaer_movement(guiref, model: RobotClampExecutionModel, movement: RoboticLinearMovement):
 
-    return execute_robotic_free_movement(model, movement)
+    return execute_robotic_free_movement(guiref, model, movement)
 
 
-def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, movement: RoboticClampSyncLinearMovement):
+def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutionModel, movement: RoboticClampSyncLinearMovement):
     """Performs RoboticFreeMovement Movement by setting the robot's IO signals
 
     This functions blocks and waits for the completion. For example if operator did not
@@ -350,14 +358,14 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
     #     return False
 
     # Ask user to press play on TP
-    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
     model.ros_robot.send(rrc.Stop())
-    model.ros_robot.send_and_wait(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move begins']))
+    model.ros_robot.send_and_wait(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
 
     # Remove clamp prefix and send command
     clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
     velocity = model.settings[movement.speed_type]
-    position =  movement.jaw_positions[0]
+    position = movement.jaw_positions[0]
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
     clamp_action_finished = False
 
@@ -367,6 +375,8 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
             logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
             break
 
+    guiref['exe']['last_completed_trajectory_point'].set(" - ")
+    guiref['exe']['last_deviation'].set(" - ")
     # Execute robot trajectory step by step
     for current_step, point in enumerate(movement.trajectory.points):
         if current_step < active_point:
@@ -400,8 +410,10 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
                 # Compute Deviation
                 deviation = "?"
                 logger_exe.info("Point %i is done. Delta time %f seconds. Deviation is %s" %
-                                 (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
+                                (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
                 last_time = datetime.datetime.now()
+                guiref['exe']['last_completed_trajectory_point'].set(str(active_point))
+                guiref['exe']['last_deviation'].set(str(deviation))
                 active_point += 1
 
             # Breaks entirely if model.run_status is STOPPED
@@ -416,21 +428,21 @@ def execute_robotic_clamp_sync_linear_movement(model: RobotClampExecutionModel, 
                 if model.ros_clamps.last_command_success:
                     logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
                     for clamp_id in clamp_ids:
-                        logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                        logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
                 else:
                     # If clamp is jammed, stop the execution
                     logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
                     for clamp_id in clamp_ids:
-                        logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
-                    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move Stopped because clamps jammed.']))
+                        logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
+                    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Stopped because clamps jammed.']))
                     return False
 
-                clamp_action_finished = True # What is left is for the robot to finish
-    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot',['RobClamp Sync Move Completed']))
+                clamp_action_finished = True  # What is left is for the robot to finish
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Completed']))
     return True
 
 
-def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: ClampsJawMovement):
+def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement: ClampsJawMovement):
     if (model.ros_clamps is None) or not model.ros_clamps.is_connected:
         logger_exe.info(
             "Clamp movement cannot start because Clamp ROS is not connected")
@@ -439,7 +451,7 @@ def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: Clamps
     # Remove clamp prefix:
     clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
     velocity = model.settings[movement.speed_type]
-    position =  movement.jaw_positions[0]
+    position = movement.jaw_positions[0]
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
 
     # Wait for clamp to ACK
@@ -457,15 +469,14 @@ def execute_clamp_jaw_movement(model: RobotClampExecutionModel, movement: Clamps
             if model.ros_clamps.last_command_success:
                 logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
                 for clamp_id in clamp_ids:
-                    logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                    logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
 
                 return True
             else:
                 logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
                 for clamp_id in clamp_ids:
-                    logger_exe.info("Clamp %s status: %s" % (clamp_id , model.ros_clamps.clamps_status[clamp_id]))
+                    logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
                 return False
-
 
         # Check if user stopped the clampping process
         if model.run_status == RunStatus.STOPPED:
@@ -535,7 +546,7 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
     if (model.ros_robot_state_softmove_enabled is None) or (model.ros_robot_state_softmove_enabled != enable):
 
         result = robot_softmove(model, enable, soft_direction=soft_direction, stiffness=stiffness,
-                    stiffness_non_soft_dir=stiffness_non_soft_dir)
+                                stiffness_non_soft_dir=stiffness_non_soft_dir)
         while (True):
             # Wait until softmove state is set.
             if result.done:

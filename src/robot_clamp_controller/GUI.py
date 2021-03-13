@@ -16,6 +16,10 @@ from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
 logger_ui = logging.getLogger("app.gui")
 
 
+#############
+# UI Creation
+#############
+
 def create_execution_gui(root, q):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)
     tk.font_value = tkFont.Font(family="Lucida Console", size=20)
@@ -176,6 +180,123 @@ def create_ui_process(root, q: Queue):
     return ui_handles
 
 
+def create_ui_execution(root, q: Queue):
+    """Creates Lower UI Frame for execution status and controls"""
+    ui_handles = {}
+
+    # Title and frame
+    title = tk.Label(root, text="Execution / Run")
+    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
+    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    left_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=30)
+    left_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
+
+    # Button Handle
+    def on_run_button_click(event=None):
+        logger_ui.info("Button Pressed: RUN")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_RUN))
+    ui_handles['run_button'] = tk.Button(
+        left_frame, text="RUN", command=on_run_button_click, font=tk.big_button_font, width=20, state="disabled")
+    ui_handles['run_button'].pack(side=tk.TOP)
+
+    def on_step_button_click(event=None):
+        logger_ui.info("Button Pressed: STEP")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP))
+    ui_handles['step_button'] = tk.Button(
+        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=20, state="disabled")
+    ui_handles['step_button'].pack(side=tk.TOP)
+
+    def on_step_from_point_button_click(event=None):
+        logger_ui.info("Button Pressed: STEP FRON POINT")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP_FROM_POINT))
+    ui_handles['step_from_pt_button'] = tk.Button(
+        left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=20, state="disabled")
+    ui_handles['step_from_pt_button'].pack(side=tk.TOP)
+
+    def on_stop_button_click(event=None):
+        logger_ui.info("Button Pressed: STOP")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_STOP))
+    ui_handles['stop_button'] = tk.Button(
+        left_frame, text="STOP", command=on_stop_button_click, font=tk.big_button_font, width=20, state="disabled")
+    ui_handles['stop_button'].pack(side=tk.TOP)
+
+    run_status_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    run_status_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
+
+    ui_handles['exe_status'] = tk.StringVar(value="Stopped")
+    ui_handles['exe_status_label'] = tk.Label(run_status_frame, textvariable=ui_handles['exe_status'], font=tk.big_status_font, anchor=tk.CENTER, height=2)
+    ui_handles['exe_status_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
+    def on_confirm_button_click(event=None):
+        logger_ui.info("Button Pressed: Confirm")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_CONFIRM))
+        confirm_button.config(state="disabled")
+
+    ui_handles['confirm_button_text'] = tk.StringVar(value="Confirm?")
+    ui_handles['confirm_button'] = confirm_button = tk.Button(run_status_frame, textvariable=ui_handles['confirm_button_text'],
+                                                              command=on_confirm_button_click, font=tk.big_button_font, width=20, height=2, state="disabled", bg='grey')
+    ui_handles['confirm_button'].pack(side=tk.BOTTOM)
+
+    status_details_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    status_details_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
+
+    ui_handles['last_completed_trajectory_point'] = tk.StringVar(value=" - ")
+    tk.Label(status_details_frame, text="Last Trajectory Point", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(status_details_frame, textvariable=ui_handles['last_completed_trajectory_point'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
+    ui_handles['last_executed_movement'] = tk.StringVar(value=" - ")
+    tk.Label(status_details_frame, text="Last Movement", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(status_details_frame, textvariable=ui_handles['last_executed_movement'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
+    ui_handles['last_deviation'] = tk.StringVar(value=" - ")
+    tk.Label(status_details_frame, text="Last Deviation", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(status_details_frame, textvariable=ui_handles['last_deviation'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
+    right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
+
+    def on_goto_start_state_button_click(event=None):
+        logger_ui.info("Button Pressed: GOTO Start State")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
+    tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_goto_end_state_button_click(event=None):
+        logger_ui.info("Button Pressed: GOTO END State")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
+    tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_print_summary_button_click(event=None):
+        logger_ui.info("Button Pressed: Print Selected Beam Action Summary")
+        q.put(SimpleNamespace(type=BackgroundCommand.PRINT_ACTION_SUMMARY))
+    tk.Button(right_frame, text="Print Selected Beam Action Summary",
+              command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
+
+    def on_goto_start_state_button_click(event=None):
+        logger_ui.info("Button Pressed: Robot Soft Mode")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_ENABLE))
+    tk.Button(right_frame_2, text="Robot Soft Mode", command=on_goto_start_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_goto_end_state_button_click(event=None):
+        logger_ui.info("Button Pressed: Robot Hard Mode")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_DISABLE))
+    tk.Button(right_frame_2, text="Robot Hard Mode", command=on_goto_end_state_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    return ui_handles
+
+#####################################
+# Helper functions for tree view
+#####################################
+
+
 def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     """ Initialize the actions treeview after laoding process
 
@@ -230,22 +351,6 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
     # Make sure we sees the first selected row
     tree.see(tree.selection())
     logger_ui.info("Actions Treeview Updated")
-
-
-def enable_run_buttons(guiref):
-    # Enable Run buttons
-    guiref['exe']['run_button'].config(state="normal")
-    guiref['exe']['step_button'].config(state="normal")
-    guiref['exe']['step_from_pt_button'].config(state="normal")
-    guiref['exe']['stop_button'].config(state="normal")
-
-
-def disable_run_buttons(guiref):
-    # Enable Run buttons
-    guiref['exe']['run_button'].config(state="disabled")
-    guiref['exe']['step_button'].config(state="disabled")
-    guiref['exe']['step_from_pt_button'].config(state="disabled")
-    guiref['exe']['stop_button'].config(state="disabled")
 
 
 def update_treeview_row(guiref, model, movement):
@@ -328,102 +433,25 @@ def treeview_select_next_movement(guiref):
     # Will return the selected move_id
     return treeview_get_selected_id(guiref)
 
+#####################################
+# Helper functions for buttons
+#####################################
 
-def create_ui_execution(root, q: Queue):
-    ui_handles = {}
 
-    # Title and frame
-    title = tk.Label(root, text="Execution / Run")
-    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
-    frame = ttk.Frame(root, borderwidth=2, relief='solid')
-    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+def enable_run_buttons(guiref):
+    # Enable Run buttons
+    guiref['exe']['run_button'].config(state="normal")
+    guiref['exe']['step_button'].config(state="normal")
+    guiref['exe']['step_from_pt_button'].config(state="normal")
+    guiref['exe']['stop_button'].config(state="normal")
 
-    left_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=30)
-    left_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
 
-    # Button Handle
-    def on_run_button_click(event=None):
-        logger_ui.info("Button Pressed: RUN")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_RUN))
-    ui_handles['run_button'] = tk.Button(
-        left_frame, text="RUN", command=on_run_button_click, font=tk.big_button_font, width=20, state="disabled")
-    ui_handles['run_button'].pack(side=tk.TOP)
-
-    def on_step_button_click(event=None):
-        logger_ui.info("Button Pressed: STEP")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP))
-    ui_handles['step_button'] = tk.Button(
-        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=20, state="disabled")
-    ui_handles['step_button'].pack(side=tk.TOP)
-
-    def on_step_from_point_button_click(event=None):
-        logger_ui.info("Button Pressed: STEP FRON POINT")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP_FROM_POINT))
-    ui_handles['step_from_pt_button'] = tk.Button(
-        left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=20, state="disabled")
-    ui_handles['step_from_pt_button'].pack(side=tk.TOP)
-
-    def on_stop_button_click(event=None):
-        logger_ui.info("Button Pressed: STOP")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STOP))
-    ui_handles['stop_button'] = tk.Button(
-        left_frame, text="STOP", command=on_stop_button_click, font=tk.big_button_font, width=20, state="disabled")
-    ui_handles['stop_button'].pack(side=tk.TOP)
-
-    middle_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
-    middle_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
-
-    ui_handles['exe_status'] = tk.StringVar(value="Stopped")
-    ui_handles['exe_status_label'] = tk.Label(middle_frame, textvariable=ui_handles['exe_status'], font=tk.big_status_font, anchor=tk.CENTER, height=2)
-    ui_handles['exe_status_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
-
-    def on_confirm_button_click(event=None):
-        logger_ui.info("Button Pressed: Confirm")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_CONFIRM))
-        confirm_button.config(state="disabled")
-
-    ui_handles['confirm_button_text'] = tk.StringVar(value="Confirm?")
-    ui_handles['confirm_button'] = confirm_button = tk.Button(middle_frame, textvariable=ui_handles['confirm_button_text'],
-                                                              command=on_confirm_button_click, font=tk.big_button_font, width=20, height=2, state="disabled", bg='grey')
-    ui_handles['confirm_button'].pack(side=tk.BOTTOM)
-
-    right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
-    right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
-
-    def on_goto_start_state_button_click(event=None):
-        logger_ui.info("Button Pressed: GOTO Start State")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
-    tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click,
-              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
-    def on_goto_end_state_button_click(event=None):
-        logger_ui.info("Button Pressed: GOTO END State")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
-    tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click,
-              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
-    def on_print_summary_button_click(event=None):
-        logger_ui.info("Button Pressed: Print Selected Beam Action Summary")
-        q.put(SimpleNamespace(type=BackgroundCommand.PRINT_ACTION_SUMMARY))
-    tk.Button(right_frame, text="Print Selected Beam Action Summary",
-              command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
-    right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
-    right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
-
-    def on_goto_start_state_button_click(event=None):
-        logger_ui.info("Button Pressed: Robot Soft Mode")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_ENABLE))
-    tk.Button(right_frame_2, text="Robot Soft Mode", command=on_goto_start_state_button_click,
-              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
-    def on_goto_end_state_button_click(event=None):
-        logger_ui.info("Button Pressed: Robot Hard Mode")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_DISABLE))
-    tk.Button(right_frame_2, text="Robot Hard Mode", command=on_goto_end_state_button_click,
-              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
-
-    return ui_handles
+def disable_run_buttons(guiref):
+    # Enable Run buttons
+    guiref['exe']['run_button'].config(state="disabled")
+    guiref['exe']['step_button'].config(state="disabled")
+    guiref['exe']['step_from_pt_button'].config(state="disabled")
+    guiref['exe']['stop_button'].config(state="disabled")
 
 
 def ui_update_run_status(guiref, model: RobotClampExecutionModel):
@@ -443,6 +471,10 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
     if model.run_status == RunStatus.ERROR:
         guiref['exe']['exe_status'].set("Error Stopped")
         guiref['exe']['exe_status_label'].config(bg="red")
+
+#################
+# POP UP Windows
+#################
 
 
 class SettingsPopupWindow(object):
