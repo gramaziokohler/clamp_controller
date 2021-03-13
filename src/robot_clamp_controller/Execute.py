@@ -1,12 +1,18 @@
-from robot_clamp_controller.ProcessModel import RobotClampExecutionModel, RunStatus
-from integral_timber_joints.process.action import *
-import time
+import datetime
 import logging
+import time
+from types import SimpleNamespace
+
 import compas_rrc as rrc
+from compas.geometry.primitives.frame import Frame
+from compas.geometry.primitives.point import Point
 from compas_fab.robots import to_degrees
 from compas_fab.robots.configuration import Configuration
-import datetime
+from integral_timber_joints.process.action import *
 
+from robot_clamp_controller.BackgroundCommand import *
+from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
+                                                 RunStatus)
 
 logger_exe = logging.getLogger("app.exe")
 
@@ -193,7 +199,7 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
     return True
 
 
-def execute_jog_robot_to_state(model, robot_state: Configuration, message: str = ""):
+def execute_jog_robot_to_state(model, robot_state: Configuration, message: str, q):
     """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
 
     This functions blocks and waits for the completion. For example if operator did not
@@ -206,7 +212,7 @@ def execute_jog_robot_to_state(model, robot_state: Configuration, message: str =
     """
     # Construct and send rrc command
     model.run_status = RunStatus.JOGGING
-
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
     point = robot_state['robot'].kinematic_config
     ext_values = to_millimeters(point.values[0:3])
     joint_values = to_degrees(point.values[3:10])
@@ -218,12 +224,14 @@ def execute_jog_robot_to_state(model, robot_state: Configuration, message: str =
 
     while (True):
         if future.done:
-            logger_exe.info(
-                "execute_jog_robot_to_state complete")
+            logger_exe.info("execute_jog_robot_to_state complete")
+            model.run_status = RunStatus.STOPPED
+            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
             return True
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn(
-                "execute_jog_robot_to_state Stopped before completion (future not arrived)")
+            logger_exe.warn("execute_jog_robot_to_state Stopped before completion (future not arrived)")
+            model.run_status = RunStatus.ERROR
+            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
             return False
 
 
@@ -250,7 +258,9 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     # We store the future results of the movement commands in this list.
     # This allow us to monitor the results and keep a known number of buffer points
     futures = []
+    position_readout_futures = []
     active_point = 0
+    position_readout_point = 0
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
@@ -263,9 +273,10 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         return False
 
     # In case of a START_FROM_PT
+    # The active point number is shifted
     if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
         active_point = model.alternative_start_point
-
+        position_readout_point = active_point
 
     guiref['exe']['last_completed_trajectory_point'].set(" - ")
     guiref['exe']['last_deviation'].set(" - ")
@@ -274,6 +285,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         if current_step < active_point:
             # insert a dummy future to fill the gap
             futures.append(None)
+            position_readout_futures.append(None)
             continue
 
         # Format movement and send robot command
@@ -290,6 +302,8 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
             zone = FINAL_ZONE
         future = model.ros_robot.send(rrc.MoveToJoints(j, e, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
         futures.append(future)
+        # Send command to read position back
+        position_readout_futures.append(model.ros_robot.send(rrc.GetRobtarget()))
 
         # Lopping while active_point is just STEPS_TO_BUFFER before the current_step.
         while (True):
@@ -298,20 +312,33 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
                 break
             # Advance pointer when future is done
             if futures[active_point].done:
-                # Compute Deviation
-                deviation = "?"
-                logger_exe.info("Point %i is done. Delta time %f seconds. Deviation is %s" %
-                                (active_point, (datetime.datetime.now() - last_time).total_seconds(), deviation))
+
+                logger_exe.info("Point %i is done. Delta time %f seconds." %
+                                (active_point, (datetime.datetime.now() - last_time).total_seconds()))
                 last_time = datetime.datetime.now()
                 guiref['exe']['last_completed_trajectory_point'].set(str(active_point))
-                guiref['exe']['last_deviation'].set(str(deviation))
                 active_point += 1
+
+            # Read the RobTarget as it comes back, compute deviation
+            if position_readout_futures[position_readout_point].done:
+                if movement.path_from_link is not None:
+                    target_frame = movement.path_from_link["robot11_tool0"][position_readout_point]  # type: Frame
+                    target_frame = frame_to_millimeters(target_frame)
+                    target_ext_axes = to_millimeters(movement.trajectory.points[position_readout_point].values[0:3])
+                    actual_frame, actual_ext_axes = position_readout_futures[position_readout_point].value
+                    actual_ext_axes = actual_ext_axes.values[0:3]
+                    deviation_frame = target_frame.point.distance_to_point(actual_frame.point)
+                    deviation_ext_axes = Point(*target_ext_axes).distance_to_point(Point(*actual_ext_axes))
+                    logger_exe.info("Deviation for point %i: Frame Deviation = %.2fmm, ExtAxes Deviation = %.2fmm" %
+                                    (position_readout_point, deviation_frame, deviation_ext_axes))
+                    guiref['exe']['last_deviation'].set("%.2fmm" % (deviation_frame))
+                position_readout_point += 1
             # Breaks entirely if model.run_status is STOPPED
             if model.run_status == RunStatus.STOPPED:
                 logger_exe.warn("execute_robotic_free_movement stopped before completion (future not arrived)")
                 return False
 
-    # Report deviation
+    # Final deviation
     actual_frame, ext_axes = model.ros_robot.send_and_wait(rrc.GetRobtarget())
     target_frame = movement.target_frame
     deviation = target_frame.point.distance_to_point(actual_frame.point)
@@ -372,8 +399,12 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     # Wait for clamp to ACK
     while (True):
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
-            logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
+            logger_exe.info("RoboticClampSync Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
             break
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn("RoboticClampSync Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
+            return False
 
     guiref['exe']['last_completed_trajectory_point'].set(" - ")
     guiref['exe']['last_deviation'].set(" - ")
@@ -389,14 +420,17 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         assert len(point.values) == 9
         j = to_degrees(point.values[3:10])
         e = to_millimeters(point.values[0:3])
-
         speed = model.settings[movement.speed_type]
         # zone for intermediate vs final zone
         if current_step < total_steps - 1:
             zone = INTERMEDIATE_ZONE
         else:
             zone = FINAL_ZONE
+        # Command to move
         future = model.ros_robot.send(rrc.MoveToJoints(j, e, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
+        # command to read position
+        # TODO
+
         futures.append(future)
 
         # Lopping while active_point is just STEPS_TO_BUFFER before the current_step.
@@ -452,6 +486,7 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
     clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
     velocity = model.settings[movement.speed_type]
     position = movement.jaw_positions[0]
+    model.ros_clamps.last_command_success = None
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
 
     # Wait for clamp to ACK
@@ -459,6 +494,16 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
             logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
             break
+        # # Check if the the reply is negative
+        # if model.ros_clamps.sync_move_inaction == False:
+        #     if model.ros_clamps.last_command_success == False:
+        #         logger_exe.warn("Clamp Jaw Movement (%s) stopped because clamp ACK is not success." % (movement.movement_id))
+        #         return False
+        # Check if user stopped the clampping process
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
+            return False
 
     model.ros_clamps.sync_move_inaction = True
     model.ros_clamps.last_command_success = False
@@ -583,3 +628,20 @@ def to_millimeters(meters):
         List of millimeters.
     """
     return [m * 1000.0 for m in meters]
+
+
+def frame_to_millimeters(frame_in_meters: Frame):
+    """Convert a list of floats representing meters to a list of millimeters.
+
+    Parameters
+    ----------
+    radians : :obj:`list` of :obj:`float`
+        List of distance values in meters.
+
+    Returns
+    -------
+    :obj:`list` of :obj:`float`
+        List of millimeters.
+    """
+    new_point = Point(frame_in_meters.point.x * 1000.0, frame_in_meters.point.y * 1000.0, frame_in_meters.point.z * 1000.0, )
+    return Frame(new_point, frame_in_meters.xaxis, frame_in_meters.yaxis)

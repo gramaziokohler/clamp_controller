@@ -239,23 +239,37 @@ def create_ui_execution(root, q: Queue):
                                                               command=on_confirm_button_click, font=tk.big_button_font, width=20, height=2, state="disabled", bg='grey')
     ui_handles['confirm_button'].pack(side=tk.BOTTOM)
 
-    status_details_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
-    status_details_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
+    robot_status_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    robot_status_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
 
     ui_handles['last_completed_trajectory_point'] = tk.StringVar(value=" - ")
-    tk.Label(status_details_frame, text="Last Trajectory Point", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
-    tk.Label(status_details_frame, textvariable=ui_handles['last_completed_trajectory_point'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, text="Last Trajectory Point", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, textvariable=ui_handles['last_completed_trajectory_point'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
     ui_handles['last_executed_movement'] = tk.StringVar(value=" - ")
-    tk.Label(status_details_frame, text="Last Movement", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
-    tk.Label(status_details_frame, textvariable=ui_handles['last_executed_movement'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, text="Last Movement", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, textvariable=ui_handles['last_executed_movement'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
     ui_handles['last_deviation'] = tk.StringVar(value=" - ")
-    tk.Label(status_details_frame, text="Last Deviation", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
-    tk.Label(status_details_frame, textvariable=ui_handles['last_deviation'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, text="Last Deviation", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, textvariable=ui_handles['last_deviation'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
     right_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
     right_frame.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
+
+    clamp_status_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
+    clamp_status_frame.pack(fill=tk.Y, expand=0, side=tk.LEFT, padx=6, pady=3)
+
+    ui_handles['clamps_running'] = tk.StringVar(value=" - ")
+    tk.Label(clamp_status_frame, text="Clamps Running", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    ui_handles['clamps_running_label'] = tk.Label(clamp_status_frame, textvariable=ui_handles['clamps_running'], font=tk.big_status_font, anchor=tk.CENTER)
+    ui_handles['clamps_running_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
+    ui_handles['clamps_last_cmd_success'] = tk.StringVar(value=" - ")
+    tk.Label(clamp_status_frame, text="Clamps Last Command", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    ui_handles['clamps_last_cmd_success_label'] = tk.Label(clamp_status_frame, textvariable=ui_handles['clamps_last_cmd_success'], font=tk.big_status_font, anchor=tk.CENTER)
+    ui_handles['clamps_last_cmd_success_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
 
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO Start State")
@@ -452,25 +466,6 @@ def disable_run_buttons(guiref):
     guiref['exe']['step_button'].config(state="disabled")
     guiref['exe']['step_from_pt_button'].config(state="disabled")
     guiref['exe']['stop_button'].config(state="disabled")
-
-
-def ui_update_run_status(guiref, model: RobotClampExecutionModel):
-    """Update the labels and indications related to execution"""
-    if model.run_status == RunStatus.STOPPED:
-        guiref['exe']['exe_status'].set("Stopped")
-        guiref['exe']['exe_status_label'].config(bg="gray")
-    if model.run_status == RunStatus.STEPPING_FORWARD:
-        guiref['exe']['exe_status'].set("Stepping")
-        guiref['exe']['exe_status_label'].config(bg="green")
-    if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
-        guiref['exe']['exe_status'].set("Stepping Fm Pt")
-        guiref['exe']['exe_status_label'].config(bg="green")
-    if model.run_status == RunStatus.RUNNING:
-        guiref['exe']['exe_status'].set("Running")
-        guiref['exe']['exe_status_label'].config(bg="green")
-    if model.run_status == RunStatus.ERROR:
-        guiref['exe']['exe_status'].set("Error Stopped")
-        guiref['exe']['exe_status_label'].config(bg="red")
 
 #################
 # POP UP Windows

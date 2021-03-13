@@ -16,8 +16,7 @@ from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.Execute import *
 from robot_clamp_controller.GUI import *
-from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
-                                                 RunStatus)
+from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel, RunStatus)
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
@@ -100,6 +99,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Start a new thread if the current one is not active
                 if model.run_thread is None or not model.run_thread.isAlive():
                     model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.name = "program_run_thread"
                     model.run_thread.start()
                 ui_update_run_status(guiref, model)
                 # Dont do anyhting if program is already running
@@ -112,6 +112,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Start a new thread if the current one is not active
                 if model.run_thread is None or not model.run_thread.isAlive():
                     model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.name = "program_run_thread"
                     model.run_thread.start()
                 ui_update_run_status(guiref, model)
 
@@ -137,12 +138,19 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 if model.run_thread is None or not model.run_thread.isAlive():
                     model.run_thread = Thread(
                         target=program_run_thread, args=(guiref, model, q), daemon=True)
+                    model.run_thread.name = "program_run_thread"
                     model.run_thread.start()
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_STOP
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STOP):
-                model.run_status = RunStatus.STOPPED
+                if model.run_status != RunStatus.STOPPED:
+                    model.run_status = RunStatus.STOPPED
+                else:
+                    # Second Press will kill the run thread
+                    if model.run_thread is not None:
+                        model.run_thread._stop()
+                        model.run_thread = None
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_CONFIRM
@@ -166,7 +174,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_CLAMP_CONNECT):
                 # Connect to new ROS host
                 guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
-                if model.connect_ros_clamps(msg.ip, q):
+                if model.connect_ros_clamps(msg.ip, partial(ros_clamps_callback, guiref, model, q)):
                     guiref['ros']['clamp_status'].set(
                         "Connected to Clamp Host")
                     logger_ctr.info("Clamp Host Connected")
@@ -199,13 +207,12 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
 
                 # Construct and send rrc command
                 state = model.process.get_movement_start_state(movement)
-                success = execute_jog_robot_to_state(
-                    model, state, message="Jogging to START State of %s " % movement.movement_id)
-                if not success:
-                    model.run_status = RunStatus.ERROR
-                else:
-                    model.run_status = RunStatus.STOPPED
-                ui_update_run_status(guiref, model)
+                message="Jogging to START State of %s "% movement.movement_id
+                jog_thread = Thread(target=execute_jog_robot_to_state, args=(model, state, message, q), daemon=True)
+                jog_thread.name = "Jogging Thread"
+                jog_thread.start()
+
+
 
             # Handelling UI_GOTO_END_STATE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
@@ -219,14 +226,11 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     return False
 
                 # Construct and send rrc command
-                state = model.process.get_movement_end_state(movement)
-                success = execute_jog_robot_to_state(
-                    model, state, message="Jogging to END State of %s " % movement.movement_id)
-                if not success:
-                    model.run_status = RunStatus.ERROR
-                else:
-                    model.run_status = RunStatus.STOPPED
-                ui_update_run_status(guiref, model)
+                state = model.process.get_movement_start_state(movement)
+                message="Jogging to START State of %s "% movement.movement_id
+                jog_thread = Thread(target=execute_jog_robot_to_state, args=(model, state, message, q), daemon=True)
+                jog_thread.name = "Jogging Thread"
+                jog_thread.start()
 
             # Handelling UI_SOFTMODE_ENABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
@@ -342,8 +346,8 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
                 break
 
         # Execution
-        success = execute_movement(model, movement)
-
+        success = execute_movement(guiref, model, movement)
+        ui_update_run_status(guiref, model)
         # Pause after
         if movement.operator_stop_after is not None:
             confirm = wait_for_opeartor_confirm(
@@ -397,13 +401,62 @@ def initialize_logging(filename: str):
     logger.info("App Started")
 
 
-def ros_clamps_callback(self, message, q=None):
+def ros_clamps_callback(guiref=None, model:RobotClampExecutionModel = None, q=None, message = None):
     # ROS command comes from a separate thread.
     # To maintain single threaded access to the Radio / Clamp,
     # we convert the ROS Command to a BackgroundCommand and place it in background command queue
+    if message is None:
+        return
+    ui_update_run_status(guiref, model)
+    logger_ros.info("Message from clamp: active = %s, last_cmd_success=%s" % (model.ros_clamps.sync_move_inaction, model.ros_clamps.last_command_success))
 
-    logger_ros.info("Ros Message Received: %s" % message)
-    pass
+
+def ui_update_run_status(guiref, model: RobotClampExecutionModel):
+    """Update the labels and indications related to execution"""
+    if model.run_status == RunStatus.STOPPED:
+        guiref['exe']['exe_status'].set("Stopped")
+        guiref['exe']['exe_status_label'].config(bg="gray")
+    if model.run_status == RunStatus.STEPPING_FORWARD:
+        guiref['exe']['exe_status'].set("Stepping")
+        guiref['exe']['exe_status_label'].config(bg="green")
+    if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
+        guiref['exe']['exe_status'].set("Stepping Fm Pt")
+        guiref['exe']['exe_status_label'].config(bg="green")
+    if model.run_status == RunStatus.RUNNING:
+        guiref['exe']['exe_status'].set("Running")
+        guiref['exe']['exe_status_label'].config(bg="green")
+    if model.run_status == RunStatus.ERROR:
+        guiref['exe']['exe_status'].set("Error Stopped")
+        guiref['exe']['exe_status_label'].config(bg="red")
+    if model.run_status == RunStatus.JOGGING:
+        guiref['exe']['exe_status'].set("Jogging")
+        guiref['exe']['exe_status_label'].config(bg="green")
+
+    # Clamps Status
+    if model.ros_clamps is not None:
+        if model.ros_clamps.sync_move_inaction is not None:
+            # Only updates if the status is not the initial None value
+            if model.ros_clamps.sync_move_inaction:
+                guiref['exe']['clamps_running'].set("Running")
+                guiref['exe']['clamps_running_label'].config(bg="green")
+
+                guiref['exe']['clamps_last_cmd_success'].set(" - ")
+                guiref['exe']['clamps_last_cmd_success_label'].config(bg="gray")
+
+            else:
+                guiref['exe']['clamps_running'].set("Stopped")
+                guiref['exe']['clamps_running_label'].config(bg="gray")
+
+                if model.ros_clamps.last_command_success:
+                    guiref['exe']['clamps_last_cmd_success'].set("Success")
+                    guiref['exe']['clamps_last_cmd_success_label'].config(bg="green")
+                else:
+                    guiref['exe']['clamps_last_cmd_success'].set("Failed")
+                    guiref['exe']['clamps_last_cmd_success_label'].config(bg="red")
+
+
+
+
 
 if __name__ == "__main__":
 

@@ -58,9 +58,7 @@ class RosClampCommandListener(Ros):
         """
         # Create message to send
         data['timestamp'] = current_milli_time()
-
         self.status_publisher.publish(roslibpy.Message({'data' : json.dumps(data)}))
-        print("Sent Status Update to ros /clamp_status")
 
 # Directly calling this script creates a listener that will print out messages.
 # It will also show the one way trip time.

@@ -183,7 +183,8 @@ class RobotClampExecutionModel(object):
                 print("Loading External Movement File: movement_path%s" %
                       movement_path)
                 with open(movement_path, 'r') as f:
-                    movement.data = json.load(f, cls=DataDecoder).data
+                    new_movement = json.load(f, cls=DataDecoder)
+                    movement.data = new_movement.data
                 movements_modified.append(movement)
         return movements_modified
 

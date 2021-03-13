@@ -37,8 +37,8 @@ class RemoteClampFunctionCall(Ros):
         self.trip_times = []
         self.external_status_change_callback = status_change_callback
         self.clamps_status = {}
-        self.sync_move_inaction = False
-        self.last_command_success = False
+        self.sync_move_inaction = None
+        self.last_command_success = None
 
         def clamp_response_callback(message_string):
             receive_time = current_milli_time()
