@@ -33,6 +33,7 @@ def create_execution_gui(root, q):
     ui_handles['ros'] = create_ui_ros(root, q)
     ui_handles['process'] = create_ui_process(root, q)
     ui_handles['exe'] = create_ui_execution(root, q)
+    ui_handles['offset'] = create_ui_offset(root, q)
     return ui_handles
 
 
@@ -292,6 +293,28 @@ def create_ui_execution(root, q: Queue):
     right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
     right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
 
+    # Soft Direction Dropdown
+    choices = {'Z','XY','XYZ','XYRZ'}
+    ui_handles['soft_direction'] = tk.StringVar(value="XYZ")
+
+    row_frame = ttk.Frame(right_frame_2)
+    row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
+    tk.Label(row_frame, text="Soft Direction", anchor=tk.W).pack(side=tk.LEFT, padx=10)
+    popupMenu = tk.OptionMenu(row_frame, ui_handles['soft_direction'], *choices).pack(side=tk.RIGHT, fill=tk.BOTH, padx=10)
+
+    # Soft Amount
+    ui_handles['stiffness_soft_dir'] = tk.StringVar(value="50")
+    ui_handles['stiffness_nonsoft_dir'] = tk.StringVar(value="90")
+    row_frame = ttk.Frame(right_frame_2)
+    row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
+    tk.Label(row_frame, text="Stiffness Soft Dir", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
+    tk.Entry(row_frame, textvariable=ui_handles['stiffness_soft_dir'], width = 10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
+    row_frame = ttk.Frame(right_frame_2)
+    row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
+    tk.Label(row_frame, text="Stiffness Non-Soft Dir", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
+    tk.Entry(row_frame, textvariable=ui_handles['stiffness_nonsoft_dir'], width = 10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
+
+
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: Robot Soft Mode")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_ENABLE))
@@ -305,6 +328,74 @@ def create_ui_execution(root, q: Queue):
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     return ui_handles
+
+def create_ui_offset(root, q: Queue):
+    """Creates Lower UI Frame for execution status and controls"""
+    ui_handles = {}
+
+    # Title and frame
+    title = tk.Label(root, text="Robot Offset (mm / deg)")
+    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
+    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    def create_text_field(name):
+        ui_handles[name] = tk.StringVar(value="0")
+        tk.Label(frame, text=name, anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
+        tk.Entry(frame, textvariable=ui_handles[name], width = 10,  justify=tk.CENTER).pack(side=tk.LEFT, fill=tk.BOTH)
+
+    create_text_field("Ext_X")
+    create_text_field("Ext_Y")
+    create_text_field("Ext_Z")
+
+    create_text_field("Rob_J1")
+    create_text_field("Rob_J2")
+    create_text_field("Rob_J3")
+    create_text_field("Rob_J4")
+    create_text_field("Rob_J5")
+    create_text_field("Rob_J6")
+
+    return ui_handles
+
+
+#####################################
+# Helper functions to get values
+#####################################
+
+def get_stiffness_soft_dir(guiref):
+    return int(float(guiref['exe']['stiffness_soft_dir'].get()))
+
+def get_stiffness_nonsoft_dir(guiref):
+    return int(float(guiref['exe']['stiffness_nonsoft_dir'].get()))
+
+def get_soft_direction(guiref):
+    return guiref['exe']['soft_direction'].get()
+
+def get_ext_offsets(guiref):
+    offset = [
+        float(guiref['offset']['Ext_X'].get()),
+        float(guiref['offset']['Ext_Y'].get()),
+        float(guiref['offset']['Ext_Z'].get()),
+        ]
+    return offset
+
+def get_joint_offsets(guiref):
+    offset = [
+        float(guiref['offset']['Rob_J1'].get()),
+        float(guiref['offset']['Rob_J2'].get()),
+        float(guiref['offset']['Rob_J3'].get()),
+        float(guiref['offset']['Rob_J4'].get()),
+        float(guiref['offset']['Rob_J5'].get()),
+        float(guiref['offset']['Rob_J6'].get()),
+        ]
+    return offset
+
+def apply_ext_offsets(guiref, ext_values):
+    return [i+j for i, j in zip(ext_values, get_ext_offsets(guiref))]
+
+def apply_joint_offsets(guiref, ext_values):
+    return [i+j for i, j in zip(ext_values, get_joint_offsets(guiref))]
+
 
 #####################################
 # Helper functions for tree view
@@ -505,3 +596,16 @@ class AlternativeStartPointWindow(object):
     def cleanup(self):
         self.value = int(self.e.get())
         self.top.destroy()
+
+
+if __name__ == "__main__":
+        # Root TK Object
+    root = tk.Tk()
+    root.title("Robot and Clamps Assembly Process Execution")
+    root.geometry("1500x800")
+
+    guiref = create_execution_gui(root, None)
+    guiref['root'] = root
+
+    # Start the TK GUI Thread
+    tk.mainloop()

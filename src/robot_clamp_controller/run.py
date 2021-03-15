@@ -208,7 +208,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Construct and send rrc command
                 state = model.process.get_movement_start_state(movement)
                 message="Jogging to START State of %s "% movement.movement_id
-                jog_thread = Thread(target=execute_jog_robot_to_state, args=(model, state, message, q), daemon=True)
+                jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
@@ -226,19 +226,23 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     return False
 
                 # Construct and send rrc command
-                state = model.process.get_movement_start_state(movement)
-                message="Jogging to START State of %s "% movement.movement_id
-                jog_thread = Thread(target=execute_jog_robot_to_state, args=(model, state, message, q), daemon=True)
+                state = model.process.get_movement_end_state(movement)
+                message="Jogging to End State of %s "% movement.movement_id
+                jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
             # Handelling UI_SOFTMODE_ENABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
-                robot_softmove(model, True, "XYZ", 20, 50)
+                model.run_status=RunStatus.JOGGING
+                robot_softmove_blocking(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref))
+                model.run_status=RunStatus.STOPPED
 
             # Handelling UI_SOFTMODE_DISABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE, check_robot_connection=True, check_status_is_stopped=True):
-                robot_softmove(model, False)
+                model.run_status=RunStatus.JOGGING
+                robot_softmove_blocking(model, False)
+                model.run_status=RunStatus.STOPPED
 
             # Returns True if a command is consumed
             return True
@@ -408,7 +412,7 @@ def ros_clamps_callback(guiref=None, model:RobotClampExecutionModel = None, q=No
     if message is None:
         return
     ui_update_run_status(guiref, model)
-    logger_ros.info("Message from clamp: active = %s, last_cmd_success=%s" % (model.ros_clamps.sync_move_inaction, model.ros_clamps.last_command_success))
+    # logger_ros.info("Message from clamp: active = %s, last_cmd_success=%s" % (model.ros_clamps.sync_move_inaction, model.ros_clamps.last_command_success))
 
 
 def ui_update_run_status(guiref, model: RobotClampExecutionModel):
