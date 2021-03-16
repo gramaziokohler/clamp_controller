@@ -293,9 +293,17 @@ def create_ui_execution(root, q: Queue):
     right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
     right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)
 
+    # Enable softmove
+    ui_handles['softmove_enable'] = tk.BooleanVar(value=False)
+    row_frame = ttk.Frame(right_frame_2)
+    row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
+    tk.Label(row_frame, text="Softmove Enable", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
+    tk.Checkbutton(row_frame, variable=ui_handles['softmove_enable']).pack(side=tk.RIGHT, fill=tk.BOTH)
+
+
     # Soft Direction Dropdown
     choices = {'Z','XY','XYZ','XYRZ'}
-    ui_handles['soft_direction'] = tk.StringVar(value="XYZ")
+    ui_handles['soft_direction'] = tk.StringVar(value="XY")
 
     row_frame = ttk.Frame(right_frame_2)
     row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
@@ -303,8 +311,8 @@ def create_ui_execution(root, q: Queue):
     popupMenu = tk.OptionMenu(row_frame, ui_handles['soft_direction'], *choices).pack(side=tk.RIGHT, fill=tk.BOTH, padx=10)
 
     # Soft Amount
-    ui_handles['stiffness_soft_dir'] = tk.StringVar(value="50")
-    ui_handles['stiffness_nonsoft_dir'] = tk.StringVar(value="90")
+    ui_handles['stiffness_soft_dir'] = tk.StringVar(value="99")
+    ui_handles['stiffness_nonsoft_dir'] = tk.StringVar(value="99")
     row_frame = ttk.Frame(right_frame_2)
     row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
     tk.Label(row_frame, text="Stiffness Soft Dir", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
@@ -361,6 +369,9 @@ def create_ui_offset(root, q: Queue):
 #####################################
 # Helper functions to get values
 #####################################
+
+def get_softness_enable(guiref):
+    return guiref['exe']['softmove_enable'].get()
 
 def get_stiffness_soft_dir(guiref):
     return int(float(guiref['exe']['stiffness_soft_dir'].get()))

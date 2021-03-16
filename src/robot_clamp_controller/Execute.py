@@ -271,11 +271,12 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
 
     # Check soft move state and send softmove command is state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
-    success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
-                                      stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
-    if not success:
-        logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
-        return False
+    if get_softness_enable(guiref):
+        success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
+                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
+        if not success:
+            logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+            return False
 
     # In case of a START_FROM_PT
     # The active point number is shifted
@@ -349,11 +350,18 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
                 return False
 
     # Final deviation
-    actual_frame, ext_axes = model.ros_robot.send_and_wait(rrc.GetRobtarget())
-    target_frame = movement.target_frame
-    deviation = target_frame.point.distance_to_point(actual_frame.point)
-    logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
-    guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
+    future = model.ros_robot.send(rrc.GetRobtarget())
+    while (True):
+        if future.done:
+            actual_frame, ext_axes = future.value
+            target_frame = movement.target_frame
+            deviation = target_frame.point.distance_to_point(actual_frame.point)
+            logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
+            guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
+            break
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
+            return False
 
     return True
 
@@ -389,11 +397,12 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     # Check soft move state and send softmove command is state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
-    success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
-                                      stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
-    if not success:
-        logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
-        return False
+    if get_softness_enable(guiref):
+        success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
+                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
+        if not success:
+            logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+            return False
 
     # Ask user to press play on TP
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
@@ -491,12 +500,18 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Completed']))
 
     # Final deviation
-    actual_frame, ext_axes = model.ros_robot.send_and_wait(rrc.GetRobtarget())
-    target_frame = movement.target_frame
-    deviation = target_frame.point.distance_to_point(actual_frame.point)
-    logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
-    guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
-
+    future = model.ros_robot.send(rrc.GetRobtarget())
+    while (True):
+        if futures.done:
+            actual_frame, ext_axes = futures.value
+            target_frame = movement.target_frame
+            deviation = target_frame.point.distance_to_point(actual_frame.point)
+            logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
+            guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
+            break
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
+            return False
     return True
 
 

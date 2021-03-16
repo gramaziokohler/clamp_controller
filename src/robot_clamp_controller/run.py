@@ -234,21 +234,25 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
 
             # Handelling UI_SOFTMODE_ENABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
-                model.run_status=RunStatus.JOGGING
-                robot_softmove_blocking(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref))
-                model.run_status=RunStatus.STOPPED
+                jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref)), daemon=True)
+                jog_thread.name = "Jog SoftMove Thread"
+                jog_thread.start()
 
             # Handelling UI_SOFTMODE_DISABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE, check_robot_connection=True, check_status_is_stopped=True):
-                model.run_status=RunStatus.JOGGING
-                robot_softmove_blocking(model, False)
-                model.run_status=RunStatus.STOPPED
+                jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, False), daemon=True)
+                jog_thread.name = "Jog SoftMove Thread"
+                jog_thread.start()
 
             # Returns True if a command is consumed
             return True
     except queue.Empty:
         return False
 
+def robot_softmove_blocking_thread(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=99, stiffness_non_soft_dir=100):
+    model.run_status=RunStatus.JOGGING
+    robot_softmove_blocking(model, enable, soft_direction, stiffness, stiffness_non_soft_dir)
+    model.run_status=RunStatus.STOPPED
 
 def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
         target_bg_command: BackgroundCommand,
