@@ -18,6 +18,7 @@ class BackgroundCommand(Enum):
     UI_OPEN_SETTING = auto()
     UI_SOFTMODE_ENABLE = auto()
     UI_SOFTMODE_DISABLE = auto()
+    UI_COMPUTE_VISUAL_CORRECTION = auto()
 
     PRINT_ACTION_SUMMARY = auto()
     MODEL_LOAD_PROCESS = auto()

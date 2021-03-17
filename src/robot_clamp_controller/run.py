@@ -244,6 +244,9 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.name = "Jog SoftMove Thread"
                 jog_thread.start()
 
+            # Handelling UI_SOFTMODE_DISABLE
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION, check_selected_is_movement=True ):
+                compute_visual_correction(guiref, model)
             # Returns True if a command is consumed
             return True
     except queue.Empty:
@@ -279,7 +282,7 @@ def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
         tree_row_id = treeview_get_selected_id(guiref)
         if not tree_row_id.startswith('m'):
             logger_bg.warn(
-                "Selected item is not a movement. Cannot proceed." % model.run_status)
+                "Selected item is not a movement: %s. Cannot proceed." % tree_row_id)
             return False
     # Return True if every check is passed
     logger_bg.info("Processing BG Command: %s" % target_bg_command)
@@ -387,6 +390,28 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
             break
 
+
+def compute_visual_correction(guiref, model: RobotClampExecutionModel):
+    align_X = guiref['offset']['Visual_X'].get()
+    align_Y = guiref['offset']['Visual_Y'].get()
+    align_Z = guiref['offset']['Visual_Z'].get()
+
+    # Retrive the selected movement target frame
+    move_id = treeview_get_selected_id(guiref)
+    movement = model.movements[move_id]  # type: RoboticMovement
+    current_movement_target_frame = movement.target_frame
+
+    from compas.geometry.transformations.transformation import Transformation
+    from compas.geometry.primitives.vector import Vector
+
+    T = Transformation.from_frame(current_movement_target_frame)
+    flange_vector = Vector(align_X, align_Y, align_Z)
+    world_vector = flange_vector.transformed(T)
+    guiref['offset']['Ext_X'].set("%.4g" % round(world_vector.x , 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
+    logger_ctr.info("Visual correction at target frame: %s" % current_movement_target_frame)
+    logger_ctr.info("- from flange (%s) to External Axis: (%s)" % (flange_vector, world_vector))
 
 def initialize_logging(filename: str):
     # Logging Setup

@@ -342,26 +342,47 @@ def create_ui_offset(root, q: Queue):
     ui_handles = {}
 
     # Title and frame
-    title = tk.Label(root, text="Robot Offset (mm / deg)")
+    title = tk.Label(root, text="Robot Offset")
     title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
-    frame = ttk.Frame(root, borderwidth=2, relief='solid')
-    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    def create_text_field(name):
+    def create_text_field(name, frame):
         ui_handles[name] = tk.StringVar(value="0")
         tk.Label(frame, text=name, anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
         tk.Entry(frame, textvariable=ui_handles[name], width = 10,  justify=tk.CENTER).pack(side=tk.LEFT, fill=tk.BOTH)
 
-    create_text_field("Ext_X")
-    create_text_field("Ext_Y")
-    create_text_field("Ext_Z")
+    # Correct by flange frame
+    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="Correction from Flange Frame:", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
 
-    create_text_field("Rob_J1")
-    create_text_field("Rob_J2")
-    create_text_field("Rob_J3")
-    create_text_field("Rob_J4")
-    create_text_field("Rob_J5")
-    create_text_field("Rob_J6")
+    create_text_field("Visual_X", frame)
+    create_text_field("Visual_Y", frame)
+    create_text_field("Visual_Z", frame)
+
+    def on_compute_visual_alignment_click(event=None):
+        logger_ui.info("Button Pressed: Compute Gantry Correction")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION))
+    tk.Button(frame, text="Compute Gantry Correction", command=on_compute_visual_alignment_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    # Correct by Joint Axis
+
+    frame = ttk.Frame(root, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="Correction by Joint (mm or deg)):", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
+
+    create_text_field("Ext_X", frame)
+    create_text_field("Ext_Y", frame)
+    create_text_field("Ext_Z", frame)
+
+    create_text_field("Rob_J1", frame)
+    create_text_field("Rob_J2", frame)
+    create_text_field("Rob_J3", frame)
+    create_text_field("Rob_J4", frame)
+    create_text_field("Rob_J5", frame)
+    create_text_field("Rob_J6", frame)
+
+
 
     return ui_handles
 
