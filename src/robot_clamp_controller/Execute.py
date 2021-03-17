@@ -295,7 +295,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
 
         # Format movement and send robot command
         logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
-        instruction = trajectory_point_to_instruction(model, movement, current_step)
+        instruction = trajectory_point_to_instruction(model, movement, guiref, current_step)
         futures.append(model.ros_robot.send(instruction))
 
         # Send command to read position back
@@ -418,7 +418,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
         # Format movement and send robot command
         logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
-        instruction = trajectory_point_to_instruction(model, movement, current_step)
+        instruction = trajectory_point_to_instruction(model, movement, guiref, current_step)
         futures.append(model.ros_robot.send(instruction))
 
         # Lopping while active_point is just STEPS_TO_BUFFER before the current_step.
@@ -624,6 +624,7 @@ def send_and_wait_unless_cancel(model: RobotClampExecutionModel, instruction: rr
         instruction: ROS Message representing the instruction to send.
         model: RobotClampExecutionModel where model.ros_robot contains a ABBClient
     """
+    instruction.feedback_level = rrc.FeedbackLevel.DONE
     future = model.ros_robot.send(instruction)
     while (True):
         if future.done:
@@ -643,7 +644,7 @@ def check_deviation(model: RobotClampExecutionModel, target_frame: Frame) -> Opt
         return None
 
 
-def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: Movement, point_n: int,
+def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: Movement, guiref, point_n: int,
                                     apply_offset: bool = True,
                                     fine_zone_points: int = 1,
                                     feedback_level: rrc.FeedbackLevel = rrc.FeedbackLevel.DONE,
