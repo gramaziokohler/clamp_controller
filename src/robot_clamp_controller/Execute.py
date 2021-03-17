@@ -22,6 +22,8 @@ logger_exe = logging.getLogger("app.exe")
 # TASK PERS tooldata t_A067_Tool_PG1000:=[TRUE,[[0,0,0],[1,0,0,0]],[10.72,[0,0,105],[1,0,0,0],0,0,0]];
 # TASK PERS tooldata t_A067_Tool_PG500:=[TRUE,[[0,0,0],[1,0,0,0]],[9.04,[0,0,110],[1,0,0,0],0,0,0]];
 # TASK PERS tooldata t_A067_Tool_CL3:=[TRUE,[[0,0,0],[1,0,0,0]],[7.99,[-30,4,73],[1,0,0,0],0,0,0]];
+INTERMEDIATE_ZONE = rrc.Zone.Z5
+FINAL_ZONE = rrc.Zone.FINE
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
@@ -224,20 +226,18 @@ def execute_jog_robot_to_state(guiref, model, robot_state: Configuration, messag
 
     if message != "":
         model.ros_robot.send(rrc.PrintText(message))
-    future = model.ros_robot.send(rrc.MoveToJoints(
-        joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE))
 
-    while (True):
-        if future.done:
-            logger_exe.info("execute_jog_robot_to_state complete")
-            model.run_status = RunStatus.STOPPED
-            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-            return True
-        if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("execute_jog_robot_to_state Stopped before completion (future not arrived)")
-            model.run_status = RunStatus.ERROR
-            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-            return False
+    instruction = rrc.MoveToJoints(joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE)
+    future = send_and_wait_unless_cancel(model, instruction)
+    if future.done:
+        logger_exe.info("execute_jog_robot_to_state complete")
+        model.run_status = RunStatus.STOPPED
+    else:
+        logger_exe.warn("execute_jog_robot_to_state Stopped before completion (future not arrived)")
+
+    # Trigger update Status
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    return future.done
 
 
 def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movement: RoboticFreeMovement):
@@ -272,9 +272,8 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     # Check soft move state and send softmove command is state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     if get_softness_enable(guiref):
-        success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
-                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
-        if not success:
+        if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
+                                       stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
             logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
             return False
 
@@ -296,22 +295,9 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
 
         # Format movement and send robot command
         logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
-        assert len(point.values) == 9
-        ext_values = to_millimeters(point.values[0:3])
-        joint_values = to_degrees(point.values[3:10])
-        speed = model.settings[movement.speed_type]
+        instruction = trajectory_point_to_instruction(model, movement, current_step)
+        futures.append(model.ros_robot.send(instruction))
 
-        # Apply Offsets
-        ext_values = apply_ext_offsets(guiref, ext_values)
-        joint_values = apply_joint_offsets(guiref, joint_values)
-
-        # zone for intermediate vs final zone
-        if current_step < total_steps - 1:
-            zone = INTERMEDIATE_ZONE
-        else:
-            zone = FINAL_ZONE
-        future = model.ros_robot.send(rrc.MoveToJoints(joint_values, ext_values, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
-        futures.append(future)
         # Send command to read position back
         # position_readout_futures.append(model.ros_robot.send(rrc.GetRobtarget()))
 
@@ -350,18 +336,13 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
                 return False
 
     # Final deviation
-    future = model.ros_robot.send(rrc.GetRobtarget())
-    while (True):
-        if future.done:
-            actual_frame, ext_axes = future.value
-            target_frame = movement.target_frame
-            deviation = target_frame.point.distance_to_point(actual_frame.point)
-            logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
-            guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
-            break
-        if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
-            return False
+    deviation = check_deviation(model, movement.target_frame)
+    if deviation is not None:
+        logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
+        guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
+    else:
+        logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
+        return False
 
     return True
 
@@ -383,8 +364,6 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     will return False.
     """
 
-    INTERMEDIATE_ZONE = rrc.Zone.Z5
-    FINAL_ZONE = rrc.Zone.FINE
     STEPS_TO_BUFFER = 1  # Number of steps to allow in the robot buffer
 
     if movement.trajectory is None:
@@ -398,16 +377,18 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     # Check soft move state and send softmove command is state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     if get_softness_enable(guiref):
-        success = robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
-                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref))
-        if not success:
-            logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+        if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
+                                       stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
+            logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause robot_softmove_blocking() failed.")
             return False
 
     # Ask user to press play on TP
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
     model.ros_robot.send(rrc.Stop())
-    model.ros_robot.send_and_wait(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
+    result = send_and_wait_unless_cancel(model, rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
+    if result.done == False:
+        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
+        return False
 
     # Remove clamp prefix and send command
     clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
@@ -437,26 +418,8 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
         # Format movement and send robot command
         logger_exe.info("Sending command %i of %i" % (current_step, total_steps))
-        assert len(point.values) == 9
-        joint_values = to_degrees(point.values[3:10])
-        ext_values = to_millimeters(point.values[0:3])
-        speed = model.settings[movement.speed_type]
-
-        # Apply Offsets
-        ext_values = apply_ext_offsets(guiref, ext_values)
-        joint_values = apply_joint_offsets(guiref, joint_values)
-
-        # zone for intermediate vs final zone
-        if current_step < total_steps - 1:
-            zone = INTERMEDIATE_ZONE
-        else:
-            zone = FINAL_ZONE
-        # Command to move
-        future = model.ros_robot.send(rrc.MoveToJoints(joint_values, ext_values, speed, zone, feedback_level=rrc.FeedbackLevel.DONE))
-        # command to read position
-        # TODO
-
-        futures.append(future)
+        instruction = trajectory_point_to_instruction(model, movement, current_step)
+        futures.append(model.ros_robot.send(instruction))
 
         # Lopping while active_point is just STEPS_TO_BUFFER before the current_step.
         while (True):
@@ -478,7 +441,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             # Breaks entirely if model.run_status is STOPPED
             if model.run_status == RunStatus.STOPPED:
                 model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
-                logger_exe.warn("execute_robotic_free_movement stopped before completion (future not arrived)")
+                logger_exe.warn("execute_robotic_clamp_sync_linear_movement stopped before completion (future not arrived)")
                 return False
 
             # Check if clamps are running or not
@@ -500,18 +463,13 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Completed']))
 
     # Final deviation
-    future = model.ros_robot.send(rrc.GetRobtarget())
-    while (True):
-        if futures.done:
-            actual_frame, ext_axes = futures.value
-            target_frame = movement.target_frame
-            deviation = target_frame.point.distance_to_point(actual_frame.point)
-            logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
-            guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
-            break
-        if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
-            return False
+    deviation = check_deviation(model, movement.target_frame)
+    if deviation is not None:
+        logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
+        guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
+    else:
+        logger_exe.warn("execute_robotic_clamp_sync_linear_movement stopped before deviation result (future not arrived)")
+        return False
     return True
 
 
@@ -582,8 +540,8 @@ def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
 
 def robot_goto_frame(model: RobotClampExecutionModel,  frame, speed):
     """Blocking call to go to a frame. Not cancelable."""
-    model.ros_robot.send_and_wait(rrc.MoveToFrame(
-        frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR))
+    instruction = rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, motion_type=rrc.Motion.LINEAR)
+    send_and_wait_unless_cancel(model, instruction)
 
 
 def robot_softmove(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=99, stiffness_non_soft_dir=100):
@@ -647,6 +605,73 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
     else:
         logger_exe.info("robot_softmove_blocking() skipped - current softmove state (%s) is the same." % model.ros_robot_state_softmove_enabled)
         return True
+
+
+#########################
+# rrc Helper Functions
+#########################
+
+def send_and_wait_unless_cancel(model: RobotClampExecutionModel, instruction: rrc.ROSmsg) -> rrc.FutureResult:
+    """Send instruction and wait for feedback.
+
+    This is a blocking call, it will return if the ABBClient
+    send the requested feedback, or if model.run_status == RunStatus.STOPPED
+
+    Returns the Future Result. If future.done == True, the result will contain the feedback.
+    Otherwise the result is not received. Meaning the function returned from user cancel.
+
+    Args:
+        instruction: ROS Message representing the instruction to send.
+        model: RobotClampExecutionModel where model.ros_robot contains a ABBClient
+    """
+    future = model.ros_robot.send(instruction)
+    while (True):
+        if future.done:
+            return future
+        if model.run_status == RunStatus.STOPPED:
+            return future
+
+
+def check_deviation(model: RobotClampExecutionModel, target_frame: Frame) -> Optional[float]:
+    # Final deviation
+    future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
+    if future.done:
+        actual_frame, ext_axes = future.value
+        deviation = target_frame.point.distance_to_point(actual_frame.point)
+        return deviation
+    else:
+        return None
+
+
+def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: Movement, point_n: int,
+                                    apply_offset: bool = True,
+                                    fine_zone_points: int = 1,
+                                    feedback_level: rrc.FeedbackLevel = rrc.FeedbackLevel.DONE,
+                                    ) -> rrc.MoveToJoints:
+    """Create a rrc.MoveToJoints instruction for a trajectory point
+    """
+    # Retrive a specific point in the trajectory.
+    point = movement.trajectory.points[point_n]
+    assert len(point.values) == 9
+
+    # Ext Axis and Joint Values
+    ext_values = to_millimeters(point.values[0:3])
+    joint_values = to_degrees(point.values[3:10])
+
+    # Apply Axis / Joints Offsets
+    if apply_offset:
+        ext_values = apply_ext_offsets(guiref, ext_values)
+        joint_values = apply_joint_offsets(guiref, joint_values)
+
+    # Speed and Zone
+    speed = model.settings[movement.speed_type]
+    if point_n < len(movement.trajectory.points) - fine_zone_points:
+        zone = INTERMEDIATE_ZONE
+    else:
+        zone = FINAL_ZONE
+
+    # Command to Move
+    return rrc.MoveToJoints(joint_values, ext_values, speed, zone, feedback_level=feedback_level)
 
 
 ##################
