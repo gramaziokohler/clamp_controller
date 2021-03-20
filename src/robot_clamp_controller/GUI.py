@@ -142,6 +142,23 @@ def create_ui_process(root, q: Queue):
     tk.Button(frame, text="Reload External Json",
               command=on_load_ext_movement_button_click).pack(side=tk.LEFT)
 
+    # DropDown List of all beams
+    def on_goto_beam_combobox_selected(eventObject):
+        beam_id = ui_handles['goto_beam_combobox'].get()
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_TREEVIEW_GOTO_BEAM, beam_id=beam_id))
+
+    ui_handles['goto_beam_value'] = tk.StringVar(value="")
+    goto_beam_combobox = ttk.Combobox(frame, width = 27, textvariable = ui_handles['goto_beam_value'])
+    goto_beam_combobox.pack(side=tk.LEFT, padx=6)
+    goto_beam_combobox.bind("<<ComboboxSelected>>", on_goto_beam_combobox_selected)
+    ui_handles['goto_beam_combobox'] = goto_beam_combobox
+
+    def on_test_button_click(event=None):
+        q.put(SimpleNamespace(type=BackgroundCommand.TEST))
+    # Load Process Button
+    tk.Button(frame, text="Test",
+              command=on_test_button_click).pack(side=tk.LEFT, padx=6)
+
     # Second Frame holds the treeview for process Movements and Actions List
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=1, side=tk.TOP, padx=6, pady=3)
@@ -363,7 +380,7 @@ def create_ui_offset(root, q: Queue):
         logger_ui.info("Button Pressed: Compute Gantry Correction")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION))
     tk.Button(frame, text="Compute Gantry Correction", command=on_compute_visual_alignment_click,
-              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+              font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     # Correct by Joint Axis
 
@@ -641,3 +658,4 @@ if __name__ == "__main__":
 
     # Start the TK GUI Thread
     tk.mainloop()
+

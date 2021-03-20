@@ -16,6 +16,7 @@ class BackgroundCommand(Enum):
     UI_GOTO_END_STATE = auto()
     UI_LOAD_EXT_MOVEMENT = auto()
     UI_OPEN_SETTING = auto()
+    UI_TREEVIEW_GOTO_BEAM = auto()
     UI_SOFTMODE_ENABLE = auto()
     UI_SOFTMODE_DISABLE = auto()
     UI_COMPUTE_VISUAL_CORRECTION = auto()
@@ -23,3 +24,5 @@ class BackgroundCommand(Enum):
     PRINT_ACTION_SUMMARY = auto()
     MODEL_LOAD_PROCESS = auto()
     EXE_CLAMPS_JAMMED = auto()
+
+    TEST = auto()

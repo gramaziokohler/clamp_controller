@@ -7,14 +7,14 @@ from functools import partial
 from threading import Thread
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
+from copy import deepcopy
 import time
 
 from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 from compas.utilities import DataDecoder
 from compas_fab.backends.ros import RosClient
 from compas_rrc import AbbClient
-from integral_timber_joints.process import (Action, LoadBeamAction,
-                                            RobotClampAssemblyProcess)
+from integral_timber_joints.process import *
 from integral_timber_joints.process.movement import *
 from robot_clamp_controller.BackgroundCommand import *
 
@@ -127,38 +127,22 @@ class RobotClampExecutionModel(object):
         self.process_path = json_path
 
         # Load external movements if possible
-        self.load_external_movements()
-        # mark_movements_as_soft_move
-        self._mark_movements_as_softmove()
+        external_movements = self.process.load_external_movements(os.path.dirname(self.process_path))
+        logger_model.info("External Movemenmts: %s movements loaded" % len(external_movements))
 
-        # Organize movements into an OrderedDict collection for easier manupulation
+        # mark_movements_as_soft_move
+        _mark_movements_as_softmove(self.process)
+
+        # Insert operator offsets
+        _insert_offset_movements(self.process)
+
+        # Organize movements into an OrderedDict collection for UI manupulation
         self.movements = OrderedDict()  # type : OrderedDict(Movement)
         for i, action in enumerate(self.process.actions):
             action.tree_row_id = 'a_%i' % action.act_n
             for move_n, movement in enumerate(action.movements):
-                movement.tree_row_id = "m%i_%i" % (action.act_n, move_n)
+                movement.tree_row_id = "m_%s" % (movement.movement_id)
                 self.movements[movement.tree_row_id] = movement
-
-    def _mark_movements_as_softmove(self):
-        # type: () -> None
-        """Marks the final movements of the assembly process as soft move."""
-        process = self.process
-        for i, action in enumerate(process.actions):
-            for j, movement in enumerate(action.movements):
-                # Default
-                movement.softmove = False
-                # Softmove cases
-                if isinstance(movement, RoboticClampSyncLinearMovement) and movement.speed_type == 'speed.assembly.clamping':
-                    movement.softmove = True
-                    logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
-                if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
-                    movement.softmove = True
-                    logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
-
-                if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
-                    if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
-                        movement.softmove = True
-                        logger_model.info("Movement (%s) %s marked as soft move" % (movement.movement_id, movement.tag))
 
     def settings_file_path_default(self):
         return os.path.join(tempfile.gettempdir(), "itj_process_execution_setting.json")
@@ -171,22 +155,6 @@ class RobotClampExecutionModel(object):
         if os.path.exists(path):
             osCommandString = "notepad.exe " + path
             os.system(osCommandString)
-
-    def load_external_movements(self):
-        # type: () -> list(Movement)
-        """Load External Movements, returns all the movements modified"""
-        process_folder = os.path.dirname(self.process_path)
-        movements_modified = []
-        for movement in self.process.movements:
-            movement_path = os.path.join(process_folder, movement.filepath)
-            if os.path.exists(movement_path):
-                print("Loading External Movement File: movement_path%s" %
-                      movement_path)
-                with open(movement_path, 'r') as f:
-                    new_movement = json.load(f, cls=DataDecoder)
-                    movement.data = new_movement.data
-                movements_modified.append(movement)
-        return movements_modified
 
     def connect_ros_clamps(self, ip, status_change_callback=None):
         """Function to connect to ROS CLamps Client.
@@ -238,9 +206,9 @@ class RobotClampExecutionModel(object):
             return False
             pass
 
-    def joint_offset(self, robot_joint_values):
-        assert len(robot_joint_values) == 6
-        return [(value + offset) for (value, offset) in zip(robot_joint_values, self.settings["robot.joint_offset"])]
+    # def joint_offset(self, robot_joint_values):
+    #     assert len(robot_joint_values) == 6
+    #     return [(value + offset) for (value, offset) in zip(robot_joint_values, self.settings["robot.joint_offset"])]
 
     @property
     def process_description(self):
@@ -252,3 +220,111 @@ class RobotClampExecutionModel(object):
                 len(self.process.actions),
                 len(self.process.movements),
             )
+
+#######################
+# Functions for modifying process only for execution
+#
+
+
+def _mark_movements_as_softmove(process):
+    # type: (RobotClampAssemblyProcess) -> None
+    """Marks selected movements of the assembly process as soft move."""
+    for i, action in enumerate(process.actions):
+        for j, movement in enumerate(action.movements):
+            # Default
+            movement.softmove = False
+            # Softmove cases
+            if isinstance(movement, RoboticClampSyncLinearMovement) and movement.speed_type == 'speed.assembly.clamping':
+                movement.softmove = True
+                logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+
+            #
+            if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
+                movement.softmove = True
+                logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+
+            # The linear movement where the tool changer is docking
+            if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
+                if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
+                    movement.softmove = True
+                    logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+
+
+class OperatorAddJogOffset(Movement):
+    def __init__(self, original_frame=None, tag=None):
+        # type: (Frame, str) -> OperatorAddJogOffset
+        Movement.__init__(self, planning_priority=-1, tag=tag)
+        self.original_frame = original_frame.copy()  # type: Frame
+        self.tag = tag or "Opeartor Jog Robot to obtain a cartesian offset."
+
+    def __str__(self):
+        return "OperatorAddJogOffset for target frame at %s." % (self.original_frame)
+
+
+class OperatorAddVisualOffset(Movement):
+    def __init__(self, target_frame=None, tag=None):
+        # type: (Frame, str) -> OperatorAddVisualOffset
+        Movement.__init__(self, planning_priority=-1, tag=tag)
+        self.target_frame = target_frame.copy()  # type: Frame
+        self.tag = tag or "Opeartor key-in visual offset, resulting in cartesian offset."
+
+    def __str__(self):
+        return "OperatorAddVisualOffset for target frame at %s." % (self.target_frame)
+
+
+class RemoveOperatorOffset(Movement):
+    def __init__(self, beam_id=None, tag=None):
+        # type: (str, Frame, str) -> OperatorAddVisualOffset
+        Movement.__init__(self, planning_priority=-1, tag=tag)
+        self.tag = tag or "Removing operator offset"
+
+
+def _insert_offset_movements(process):
+    # type: (RobotClampAssemblyProcess) -> None
+    """Adds OperatorAddJogOffset, OperatorAddVisualOffset and RemoveOperatorOffset movements of the assembly process as soft move"""
+    for i, action in enumerate(process.actions):
+        # Aligning clamp pins with holes on joint
+        if isinstance(action, PlaceClampToStructureAction):
+            # Retrive the second linear approach movement
+            approach_movement = action.movements[2] #type: RoboticLinearMovement
+            offset_on = OperatorAddJogOffset(approach_movement.target_frame, tag= "Jog offset until gripper pin in hole")
+            offset_on.movement_id = "A%i_O0" % action.act_n
+            offset_on.end_state = deepcopy(approach_movement.end_state)
+
+            offset_off = RemoveOperatorOffset(tag = "Remove offset after clamp placement")
+            offset_off.movement_id = "A%i_O1" % action.act_n
+            offset_off.end_state = deepcopy(action.movements[-1].end_state)
+
+            action.movements.insert(3, offset_on)
+            action.movements.append(offset_off)
+
+        # Aligning joints before clamping
+        if isinstance(action, BeamPlacementWithClampsAction):
+            # Align timber joints before clamping
+            pre_clamp_movement = action.movements[1] #type: RoboticLinearMovement
+            offset_on = OperatorAddJogOffset(pre_clamp_movement.target_frame, tag= "Jog offset until joints align")
+            offset_on.movement_id = "A%i_O0" % action.act_n
+            offset_on.end_state = deepcopy(action.movements[2].end_state)
+
+            offset_off = RemoveOperatorOffset(tag = "Remove offset after beam placement")
+            offset_off.movement_id = "A%i_O1" % action.act_n
+            offset_off.end_state = deepcopy(action.movements[-1].end_state)
+
+            action.movements.insert(3, offset_on)
+            action.movements.append(offset_off)
+
+        # Aligning clamp pickup via docking camera
+        if isinstance(action, PickClampFromStructureAction):
+            # Align timber joints before clamping
+            pre_docking_movement = action.movements[0] #type: RoboticLinearMovement
+            offset_on = OperatorAddVisualOffset(pre_docking_movement.target_frame, tag= "Key in visual target offset.")
+            offset_on.movement_id = "A%i_O0" % action.act_n
+            offset_on.end_state = deepcopy(action.movements[0].end_state)
+
+            offset_off = RemoveOperatorOffset(tag = "Remove offset after beam placement")
+            offset_off.movement_id = "A%i_O1" % action.act_n
+            offset_off.end_state = deepcopy(action.movements[-1].end_state)
+
+            action.movements.insert(1, offset_on)
+            action.movements.append(offset_off)
+

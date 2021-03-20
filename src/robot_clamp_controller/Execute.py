@@ -6,13 +6,13 @@ from types import SimpleNamespace
 import compas_rrc as rrc
 from compas.geometry.primitives.frame import Frame
 from compas.geometry.primitives.point import Point
+from compas.geometry.primitives.vector import Vector
 from compas_fab.robots import to_degrees
 from compas_fab.robots.configuration import Configuration
 from integral_timber_joints.process.action import *
 
 from robot_clamp_controller.BackgroundCommand import *
-from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
-                                                 RunStatus)
+from robot_clamp_controller.ProcessModel import *
 from robot_clamp_controller.GUI import *
 
 logger_exe = logging.getLogger("app.exe")
@@ -65,9 +65,20 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     elif isinstance(movement, RoboticDigitalOutput):
         return execute_robotic_digital_output(guiref, model, movement)
 
+    elif isinstance(movement, OperatorAddJogOffset):
+        return execute_operator_add_jog_offset_movement(guiref, model, movement)
+
+    elif isinstance(movement, RemoveOperatorOffset):
+        return execute_remove_operator_offset_movement(guiref, model, movement)
+
+    elif isinstance(movement, OperatorAddVisualOffset):
+        return execute_operator_add_visual_offset_movement(guiref, model, movement)
+
     # Catch all during Development
     else:
-        return execute_some_delay(model, movement)
+        execute_some_delay(model, movement)
+        logger_exe.warn("execution code for %s does not exist." % movement)
+        return False
 
 #####################################################
 # Sub functions that handels different Movement Types
@@ -528,6 +539,155 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
             return False
 
 
+def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAddJogOffset):
+    """Performs OperatorAddJogOffset Movement by stopping execution and ask user to jog (using the robot TP).
+    Upon continuing program from robot TP, the difference between the robot frame and the original frame
+    is used as grantry XYZ offset.
+    A move is performed to make sure only external axis is jogged and the joint angles are the same as before.
+    """
+    # Read current robot external axis and joint values
+    future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
+    if future.done:
+        starting_frame, original_ext_axes = future.value
+    else:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (First GetRobtarget future not arrived)")
+        return False
+
+    ############################################
+
+    # Ask user to jog from TP and Stop Excution
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Jog now to align. Press PLAY when finished"], []))
+    future = send_and_wait_unless_cancel(model, rrc.Stop())
+    if not future.done:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (rrc.Stop future not arrived)")
+        return False
+
+    ############################################
+
+    # Upon restart, read the current robot frame.
+    future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
+    if future.done:
+        new_frame, new_ext_axes = future.value
+    else:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (Second GetRobtarget future not arrived)")
+        return False
+
+    ############################################
+
+    # Compute offset and apply to external axis.
+    offset = Vector.from_start_end(movement.original_frame.point, new_frame.point)
+    guiref['offset']['Ext_X'].set("%.4g" % offset.x)
+    guiref['offset']['Ext_Y'].set("%.4g" % offset.y)
+    guiref['offset']['Ext_Z'].set("%.4g" % offset.z)
+    guiref['offset']['Rob_J1'].set("0")
+    guiref['offset']['Rob_J2'].set("0")
+    guiref['offset']['Rob_J3'].set("0")
+    guiref['offset']['Rob_J4'].set("0")
+    guiref['offset']['Rob_J5'].set("0")
+    guiref['offset']['Rob_J6'].set("0")
+
+    ext_axes_with_offset = apply_ext_offsets(guiref, original_ext_axes)
+
+    # Movement to make sure joints have no offset
+    # Ask user to jog from TP and Stop Excution
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Offset registered: X %.3g Y %.3g Z %.3g." % (offset.x, offset.y, offset.z)], []))
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Press PLAY to accept with a gantry move."], []))
+
+    future = send_and_wait_unless_cancel(model, rrc.Stop())
+    if not future.done:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (rrc.Stop future not arrived)")
+        return False
+
+    future = send_and_wait_unless_cancel(model, rrc.MoveToRobtarget(movement.original_frame, ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
+    if future.done:
+        model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
+    else:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (MoveToRobtarget future not arrived)")
+        return False
+
+    return True
+
+
+def execute_remove_operator_offset_movement(guiref, model: RobotClampExecutionModel, movement: RemoveOperatorOffset):
+    """Performs RemoveOperatorOffset Movement by cenceling all offset. """
+    guiref['offset']['Ext_X'].set("0")
+    guiref['offset']['Ext_Y'].set("0")
+    guiref['offset']['Ext_Z'].set("0")
+    guiref['offset']['Rob_J1'].set("0")
+    guiref['offset']['Rob_J2'].set("0")
+    guiref['offset']['Rob_J3'].set("0")
+    guiref['offset']['Rob_J4'].set("0")
+    guiref['offset']['Rob_J5'].set("0")
+    guiref['offset']['Rob_J6'].set("0")
+
+class VisualOffsetPopup(object):
+
+    def __init__(self, guiref,  model: RobotClampExecutionModel, movement:OperatorAddVisualOffset):
+        self.window = tk.Toplevel(guiref['root'])
+        self.guiref = guiref
+        self.model = model
+        self.movement = movement
+        self.accpet = False
+
+        tk.Label(self.window, text="Offset from the camera target (mm)?").grid(row=0, column=0, columnspan=3)
+
+        # Entry Box for XYZ
+        # self.offset_x = tk.StringVar(value="0")
+        tk.Label(self.window, text="X").grid(row=1, column=0, columnspan=3)
+        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_X']).grid(row=1, column=1, columnspan=3)
+        # self.offset_y = tk.StringVar(value="0")
+        tk.Label(self.window, text="Y").grid(row=2, column=0, columnspan=3)
+        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_Y']).grid(row=2, column=1, columnspan=3)
+        # self.offset_z = tk.StringVar(value="0")
+        tk.Label(self.window, text="Z").grid(row=3, column=0, columnspan=3)
+        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_Z']).grid(row=3, column=1, columnspan=3)
+
+        # Buttons
+        tk.Button(self.window, text='Go', command=self.go).grid(row=4, column=0)
+        tk.Button(self.window, text='Accept', command=self.accept).grid(row=4, column=1)
+        tk.Button(self.window, text='Cancel', command=self.cancel).grid(row=4, column=2)
+
+        self.value = None
+
+    def go(self):
+        compute_visual_correction(self.guiref, self.model, self.movement)
+        robot_config =  self.movement.end_state['robot'].kinematic_config
+        move_instruction = robot_state_to_instruction(self.guiref, self.model, robot_config, 30, rrc.Zone.FINE)
+        self.model.ros_robot.send(move_instruction)
+
+    def accept(self):
+        compute_visual_correction(self.guiref, self.model, self.movement)
+        self.accpet = True
+        self.window.destroy()
+
+    def cancel(self):
+        self.model.run_status = RunStatus.STOPPED
+        self.accpet = False
+        self.window.destroy()
+
+
+def execute_operator_add_visual_offset_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAddVisualOffset):
+    """Performs OperatorAddVisualOffset by having an interactive dialog
+    Allowing user to key in offset value in flange frame.
+    The offset is applied to the gantry and """
+
+    # Open a dialog and ask user to key in three offset values
+    # Apply offset to flange frame offset, jog robot to the movement.end_state
+    if not model.process.movement_has_end_robot_config(movement):
+        logger_exe.warn("Error Attempt to execute OperatorAddVisualOffset but the movement end_state does not have robot config.")
+        return False
+
+    dialog = VisualOffsetPopup(guiref, model, movement)
+    guiref['root'].wait_window(dialog.window)
+    if dialog.ok:
+        return True
+    else:
+        return False
+
+    # Movement to go to
+
+
+
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
         time.sleep(0.3)
@@ -606,6 +766,31 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
         logger_exe.info("robot_softmove_blocking() skipped - current softmove state (%s) is the same." % model.ros_robot_state_softmove_enabled)
         return True
 
+#########################################
+# Visual Correction Helper Functions
+#########################################
+
+def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement: RoboticMovement):
+    """Compute the gantry offset from the visual offset in gui.
+    The movement must have a target_frame"""
+    align_X = guiref['offset']['Visual_X'].get()
+    align_Y = guiref['offset']['Visual_Y'].get()
+    align_Z = guiref['offset']['Visual_Z'].get()
+
+    # Retrive the selected movement target frame
+    current_movement_target_frame = movement.target_frame
+
+    from compas.geometry.transformations.transformation import Transformation
+    from compas.geometry.primitives.vector import Vector
+
+    T = Transformation.from_frame(current_movement_target_frame)
+    flange_vector = Vector(align_X, align_Y, align_Z)
+    world_vector = flange_vector.transformed(T)
+    guiref['offset']['Ext_X'].set("%.4g" % round(world_vector.x, 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
+    logger_model.info("Visual correction of Flange %s from Flange %s. Resulting in World %s" % (flange_vector, current_movement_target_frame, world_vector))
+
 
 #########################
 # rrc Helper Functions
@@ -650,19 +835,11 @@ def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: M
                                     feedback_level: rrc.FeedbackLevel = rrc.FeedbackLevel.DONE,
                                     ) -> rrc.MoveToJoints:
     """Create a rrc.MoveToJoints instruction for a trajectory point
-    """
+    taking into account of the point_n in determining speed and zone
+    apply offset set in the gui if apply_offset is true"""
+
     # Retrive a specific point in the trajectory.
     point = movement.trajectory.points[point_n]
-    assert len(point.values) == 9
-
-    # Ext Axis and Joint Values
-    ext_values = to_millimeters(point.values[0:3])
-    joint_values = to_degrees(point.values[3:10])
-
-    # Apply Axis / Joints Offsets
-    if apply_offset:
-        ext_values = apply_ext_offsets(guiref, ext_values)
-        joint_values = apply_joint_offsets(guiref, joint_values)
 
     # Speed and Zone
     speed = model.settings[movement.speed_type]
@@ -671,9 +848,27 @@ def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: M
     else:
         zone = FINAL_ZONE
 
+    return robot_state_to_instruction(guiref, model, point, speed, zone, feedback_level)
+
+
+def robot_state_to_instruction(guiref, model: RobotClampExecutionModel, robot_config: Configuration, speed, zone,
+                               feedback_level: rrc.FeedbackLevel = rrc.FeedbackLevel.DONE,
+                               apply_offset: bool = True):
+    """Create rrc.MoveToJoints instruction from robot_state
+    apply offset set in the gui if apply_offset is true"""
+    assert len(robot_config.values) == 9
+
+    # Ext Axis and Joint Values
+    ext_values = to_millimeters(robot_config.values[0:3])
+    joint_values = to_degrees(robot_config.values[3:10])
+
+    # Apply Axis / Joints Offsets
+    if apply_offset:
+        ext_values = apply_ext_offsets(guiref, ext_values)
+        joint_values = apply_joint_offsets(guiref, joint_values)
+
     # Command to Move
     return rrc.MoveToJoints(joint_values, ext_values, speed, zone, feedback_level=feedback_level)
-
 
 ##################
 # Helper Functions

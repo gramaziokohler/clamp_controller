@@ -1,6 +1,6 @@
 import cv2
 
-source = "rtsp://192.168.43.43:8554/stream"
+source = "rtsp://192.168.0.106:8554/stream"
 cap = cv2.VideoCapture(source)
 
 if cap.isOpened():

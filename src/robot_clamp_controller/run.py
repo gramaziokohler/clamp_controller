@@ -72,6 +72,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     guiref['process']['process_status'].set(
                         model.process_description)
                 init_actions_tree_view(guiref, model)
+                guiref['process']['goto_beam_combobox']['values'] = tuple(model.process.assembly.sequence)
                 enable_run_buttons(guiref)
                 guiref['root'].wm_state('zoomed')
 
@@ -86,6 +87,18 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                         f.write(popup.value)
                     model.load_settings()
                     logger_bg.info("Settings Saved")
+
+            # Handle UI_TREEVIEW_GOTO_BEAM
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_TREEVIEW_GOTO_BEAM, check_loaded_process=True, check_status_is_stopped=True):
+                tree = guiref['process']['tree']
+                # Screw tree to the bottom and scrow back up ensures the item of interest
+                # is on the first row in the treeview
+                if msg.beam_id in guiref['process']['item_ids']:
+                    tree.see(guiref['process']['item_ids'][-1])
+                    tree.see(msg.beam_id)
+                    logger_bg.info("Scrolling Treeview to see %s" % msg.beam_id)
+                else:
+                    logger_bg.warn("Cannot find Treeview item: %s" % msg.beam_id)
 
             # Handle UI_UPDATE_STATUS
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_UPDATE_STATUS):
@@ -207,12 +220,10 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
 
                 # Construct and send rrc command
                 state = model.process.get_movement_start_state(movement)
-                message="Jogging to START State of %s "% movement.movement_id
+                message = "Jogging to START State of %s " % movement.movement_id
                 jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
-
-
 
             # Handelling UI_GOTO_END_STATE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
@@ -227,7 +238,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
 
                 # Construct and send rrc command
                 state = model.process.get_movement_end_state(movement)
-                message="Jogging to End State of %s "% movement.movement_id
+                message = "Jogging to End State of %s " % movement.movement_id
                 jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
@@ -244,25 +255,38 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.name = "Jog SoftMove Thread"
                 jog_thread.start()
 
-            # Handelling UI_SOFTMODE_DISABLE
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION, check_selected_is_movement=True ):
-                compute_visual_correction(guiref, model)
+            # Handelling UI_COMPUTE_VISUAL_CORRECTION
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION, check_selected_is_movement=True):
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]  # type: RoboticMovement
+                compute_visual_correction(guiref, model, movement)
+
+
+            # Handelling TEST
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST):
+                tree_row_id = treeview_get_selected_id(guiref)
+                movement = model.movements[tree_row_id]
+                test(msg, guiref, model, movement)
+
             # Returns True if a command is consumed
+
             return True
     except queue.Empty:
         return False
 
+
 def robot_softmove_blocking_thread(model: RobotClampExecutionModel, enable: bool, soft_direction="Z", stiffness=99, stiffness_non_soft_dir=100):
-    model.run_status=RunStatus.JOGGING
+    model.run_status = RunStatus.JOGGING
     robot_softmove_blocking(model, enable, soft_direction, stiffness, stiffness_non_soft_dir)
-    model.run_status=RunStatus.STOPPED
+    model.run_status = RunStatus.STOPPED
+
 
 def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
-        target_bg_command: BackgroundCommand,
-        check_loaded_process=False,
-        check_robot_connection=False,
-        check_status_is_stopped=False,
-        check_selected_is_movement=False):
+                 target_bg_command: BackgroundCommand,
+                 check_loaded_process=False,
+                 check_robot_connection=False,
+                 check_status_is_stopped=False,
+                 check_selected_is_movement=False):
     if msg.type != target_bg_command:
         return False
     if check_loaded_process:
@@ -391,28 +415,6 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             break
 
 
-def compute_visual_correction(guiref, model: RobotClampExecutionModel):
-    align_X = guiref['offset']['Visual_X'].get()
-    align_Y = guiref['offset']['Visual_Y'].get()
-    align_Z = guiref['offset']['Visual_Z'].get()
-
-    # Retrive the selected movement target frame
-    move_id = treeview_get_selected_id(guiref)
-    movement = model.movements[move_id]  # type: RoboticMovement
-    current_movement_target_frame = movement.target_frame
-
-    from compas.geometry.transformations.transformation import Transformation
-    from compas.geometry.primitives.vector import Vector
-
-    T = Transformation.from_frame(current_movement_target_frame)
-    flange_vector = Vector(align_X, align_Y, align_Z)
-    world_vector = flange_vector.transformed(T)
-    guiref['offset']['Ext_X'].set("%.4g" % round(world_vector.x , 4))
-    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
-    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
-    logger_ctr.info("Visual correction at target frame: %s" % current_movement_target_frame)
-    logger_ctr.info("- from flange (%s) to External Axis: (%s)" % (flange_vector, world_vector))
-
 def initialize_logging(filename: str):
     # Logging Setup
     logger = logging.getLogger("app")
@@ -434,7 +436,7 @@ def initialize_logging(filename: str):
     logger.info("App Started")
 
 
-def ros_clamps_callback(guiref=None, model:RobotClampExecutionModel = None, q=None, message = None):
+def ros_clamps_callback(guiref=None, model: RobotClampExecutionModel = None, q=None, message=None):
     # ROS command comes from a separate thread.
     # To maintain single threaded access to the Radio / Clamp,
     # we convert the ROS Command to a BackgroundCommand and place it in background command queue
@@ -488,8 +490,11 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
                     guiref['exe']['clamps_last_cmd_success_label'].config(bg="red")
 
 
-
-
+def test(msg, guiref, model, movement):
+    # Open a dialog and ask user to key in three offset values
+    dialog = VisualOffsetPopup(guiref, model, movement)
+    guiref['root'].wait_window(dialog.window)
+    print ("dialog.accpet = %s" % dialog.accpet)
 
 if __name__ == "__main__":
 
