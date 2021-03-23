@@ -541,14 +541,17 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
 
 def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAddJogOffset):
     """Performs OperatorAddJogOffset Movement by stopping execution and ask user to jog (using the robot TP).
-    Upon continuing program from robot TP, the difference between the robot frame and the original frame
+    Upon continuing program from robot TP, the difference between the robot flange frame and the original frame
     is used as grantry XYZ offset.
-    A move is performed to make sure only external axis is jogged and the joint angles are the same as before.
+
+    A move is performed to make sure the offset is applied on external axis.
+    The robot joints will go back to the previous joint values in movement.end_state['robot'].
     """
     # Read current robot external axis and joint values
     future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
     if future.done:
         starting_frame, original_ext_axes = future.value
+        logger_exe.info("First Frame: %s, %s" % (starting_frame, original_ext_axes))
     else:
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (First GetRobtarget future not arrived)")
         return False
@@ -568,6 +571,8 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
     if future.done:
         new_frame, new_ext_axes = future.value
+        logger_exe.info("Second Frame: %s, %s" % (new_frame, new_ext_axes))
+
     else:
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (Second GetRobtarget future not arrived)")
         return False
@@ -576,9 +581,11 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
 
     # Compute offset and apply to external axis.
     offset = Vector.from_start_end(movement.original_frame.point, new_frame.point)
-    guiref['offset']['Ext_X'].set("%.4g" % offset.x)
-    guiref['offset']['Ext_Y'].set("%.4g" % offset.y)
-    guiref['offset']['Ext_Z'].set("%.4g" % offset.z)
+    logger_exe.info("Offset from jogging = %s (amount = %4g)" % (offset, offset.length))
+
+    guiref['offset']['Ext_X'].set("%.4g" % round(offset.x, 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * offset.y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * offset.z, 4))
     guiref['offset']['Rob_J1'].set("0")
     guiref['offset']['Rob_J2'].set("0")
     guiref['offset']['Rob_J3'].set("0")
@@ -597,13 +604,13 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     if not future.done:
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (rrc.Stop future not arrived)")
         return False
-
-    future = send_and_wait_unless_cancel(model, rrc.MoveToRobtarget(movement.original_frame, ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
-    if future.done:
-        model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
-    else:
-        logger_exe.warn("OperatorAddJogOffset Stopped before completion (MoveToRobtarget future not arrived)")
-        return False
+    # future = send_and_wait_unless_cancel(model, rrc.MoveToJoints(movement.end_state['robot'], ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
+    # future = send_and_wait_unless_cancel(model, rrc.MoveToRobtarget(movement.original_frame, ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
+    # if future.done:
+    #     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
+    # else:
+    #     logger_exe.warn("OperatorAddJogOffset Stopped before completion (MoveToRobtarget future not arrived)")
+    #     return False
 
     return True
 
@@ -619,10 +626,13 @@ def execute_remove_operator_offset_movement(guiref, model: RobotClampExecutionMo
     guiref['offset']['Rob_J4'].set("0")
     guiref['offset']['Rob_J5'].set("0")
     guiref['offset']['Rob_J6'].set("0")
+    logger_exe.info("Operator offset removed.")
+    return True
+
 
 class VisualOffsetPopup(object):
 
-    def __init__(self, guiref,  model: RobotClampExecutionModel, movement:OperatorAddVisualOffset):
+    def __init__(self, guiref,  model: RobotClampExecutionModel, movement: OperatorAddVisualOffset):
         self.window = tk.Toplevel(guiref['root'])
         self.guiref = guiref
         self.model = model
@@ -651,7 +661,7 @@ class VisualOffsetPopup(object):
 
     def go(self):
         compute_visual_correction(self.guiref, self.model, self.movement)
-        robot_config =  self.movement.end_state['robot'].kinematic_config
+        robot_config = self.movement.end_state['robot'].kinematic_config
         move_instruction = robot_state_to_instruction(self.guiref, self.model, robot_config, 30, rrc.Zone.FINE)
         self.model.ros_robot.send(move_instruction)
 
@@ -679,13 +689,12 @@ def execute_operator_add_visual_offset_movement(guiref, model: RobotClampExecuti
 
     dialog = VisualOffsetPopup(guiref, model, movement)
     guiref['root'].wait_window(dialog.window)
-    if dialog.ok:
+    if dialog.accept:
         return True
     else:
         return False
 
     # Movement to go to
-
 
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
@@ -769,6 +778,7 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
 #########################################
 # Visual Correction Helper Functions
 #########################################
+
 
 def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement: RoboticMovement):
     """Compute the gantry offset from the visual offset in gui.

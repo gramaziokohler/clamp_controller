@@ -261,7 +261,6 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 movement = model.movements[tree_row_id]  # type: RoboticMovement
                 compute_visual_correction(guiref, model, movement)
 
-
             # Handelling TEST
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST):
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -339,6 +338,10 @@ def wait_for_opeartor_confirm(guiref, model: RobotClampExecutionModel, message: 
     guiref['exe']['confirm_button_text'].set(message)
     button.config(state="normal", bg='orange')
     model.operator_confirm = False
+
+    # print message to TP if available
+    if model.ros_robot is not None:
+        model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["CONFIRM : %s ..." % (message[:50])], []))
 
     guiref['exe']['exe_status'].set("Paused")
     while (True):
@@ -494,7 +497,8 @@ def test(msg, guiref, model, movement):
     # Open a dialog and ask user to key in three offset values
     dialog = VisualOffsetPopup(guiref, model, movement)
     guiref['root'].wait_window(dialog.window)
-    print ("dialog.accpet = %s" % dialog.accpet)
+    print("dialog.accpet = %s" % dialog.accpet)
+
 
 if __name__ == "__main__":
 

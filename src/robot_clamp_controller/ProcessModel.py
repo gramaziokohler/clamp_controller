@@ -132,7 +132,8 @@ class RobotClampExecutionModel(object):
 
         # mark_movements_as_soft_move
         _mark_movements_as_softmove(self.process)
-
+        # some moves do not need operator stop anymore
+        _mark_movements_operator_stop(self.process)
         # Insert operator offsets
         _insert_offset_movements(self.process)
 
@@ -250,6 +251,23 @@ def _mark_movements_as_softmove(process):
                     logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
 
 
+def _mark_movements_operator_stop(process):
+    # type: (RobotClampAssemblyProcess) -> None
+    """Marks selected movements to have more or less operator stops"""
+    for i, action in enumerate(process.actions):
+
+        # No need confirm after tool changer undocked
+        if isinstance(action, PlaceClampToStructureAction):
+            action.movements[3].operator_stop_before = None
+            action.movements[3].operator_stop_after = None
+            action.movements[5].operator_stop_before = "Confirm Clamp is stable"
+            action.movements[5].operator_stop_after = None
+
+        if isinstance(action, PickClampFromStructureAction):
+            action.movements[1].operator_stop_before = None
+            action.movements[1].operator_stop_after = None
+
+
 class OperatorAddJogOffset(Movement):
     def __init__(self, original_frame=None, tag=None):
         # type: (Frame, str) -> OperatorAddJogOffset
@@ -286,12 +304,12 @@ def _insert_offset_movements(process):
         # Aligning clamp pins with holes on joint
         if isinstance(action, PlaceClampToStructureAction):
             # Retrive the second linear approach movement
-            approach_movement = action.movements[2] #type: RoboticLinearMovement
-            offset_on = OperatorAddJogOffset(approach_movement.target_frame, tag= "Jog offset until gripper pin in hole")
+            approach_movement = action.movements[2]  # type: RoboticLinearMovement
+            offset_on = OperatorAddJogOffset(approach_movement.target_frame, tag="Jog offset until gripper pin in hole")
             offset_on.movement_id = "A%i_O0" % action.act_n
             offset_on.end_state = deepcopy(approach_movement.end_state)
 
-            offset_off = RemoveOperatorOffset(tag = "Remove offset after clamp placement")
+            offset_off = RemoveOperatorOffset(tag="Remove offset after clamp placement")
             offset_off.movement_id = "A%i_O1" % action.act_n
             offset_off.end_state = deepcopy(action.movements[-1].end_state)
 
@@ -301,12 +319,12 @@ def _insert_offset_movements(process):
         # Aligning joints before clamping
         if isinstance(action, BeamPlacementWithClampsAction):
             # Align timber joints before clamping
-            pre_clamp_movement = action.movements[1] #type: RoboticLinearMovement
-            offset_on = OperatorAddJogOffset(pre_clamp_movement.target_frame, tag= "Jog offset until joints align")
+            pre_clamp_movement = action.movements[1]  # type: RoboticLinearMovement
+            offset_on = OperatorAddJogOffset(pre_clamp_movement.target_frame, tag="Jog offset until joints align")
             offset_on.movement_id = "A%i_O0" % action.act_n
             offset_on.end_state = deepcopy(action.movements[2].end_state)
 
-            offset_off = RemoveOperatorOffset(tag = "Remove offset after beam placement")
+            offset_off = RemoveOperatorOffset(tag="Remove offset after beam placement")
             offset_off.movement_id = "A%i_O1" % action.act_n
             offset_off.end_state = deepcopy(action.movements[-1].end_state)
 
@@ -316,15 +334,14 @@ def _insert_offset_movements(process):
         # Aligning clamp pickup via docking camera
         if isinstance(action, PickClampFromStructureAction):
             # Align timber joints before clamping
-            pre_docking_movement = action.movements[0] #type: RoboticLinearMovement
-            offset_on = OperatorAddVisualOffset(pre_docking_movement.target_frame, tag= "Key in visual target offset.")
+            pre_docking_movement = action.movements[0]  # type: RoboticLinearMovement
+            offset_on = OperatorAddVisualOffset(pre_docking_movement.target_frame, tag="Key in visual target offset.")
             offset_on.movement_id = "A%i_O0" % action.act_n
             offset_on.end_state = deepcopy(action.movements[0].end_state)
 
-            offset_off = RemoveOperatorOffset(tag = "Remove offset after beam placement")
+            offset_off = RemoveOperatorOffset(tag="Remove offset after beam placement")
             offset_off.movement_id = "A%i_O1" % action.act_n
             offset_off.end_state = deepcopy(action.movements[-1].end_state)
 
             action.movements.insert(1, offset_on)
             action.movements.append(offset_off)
-
