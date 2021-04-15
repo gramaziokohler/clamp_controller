@@ -548,22 +548,44 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     The robot joints will go back to the previous joint values in movement.end_state['robot'].
     """
     # Read current robot external axis and joint values
-    future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
+    future = send_and_wait_unless_cancel(model, rrc.GetJoints())
     if future.done:
-        starting_frame, original_ext_axes = future.value
-        logger_exe.info("First Frame: %s, %s" % (starting_frame, original_ext_axes))
+        starting_robot_joints, starting_ext_axis = future.value
+        logger_exe.info("Initial Joints: %s, %s" % (starting_robot_joints, starting_ext_axis))
     else:
-        logger_exe.warn("OperatorAddJogOffset Stopped before completion (First GetRobtarget future not arrived)")
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (First GetJoints future not arrived)")
         return False
 
     ############################################
 
     # Ask user to jog from TP and Stop Excution
-    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Jog now to align. Press PLAY when finished"], []))
-    future = send_and_wait_unless_cancel(model, rrc.Stop())
-    if not future.done:
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Press STOP, JOG to align. Press PLAY when finished"], []))
+    logger_exe.info("rrc.stop() issued")
+    future = send_and_wait_unless_cancel(model, rrc.CustomInstruction('r_A067_Stop', [], []))
+    if future.done:
+        logger_exe.info("rrc.stop() returned")
+    else:
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (rrc.Stop future not arrived)")
         return False
+
+
+    # Use UI Button to pause and confirm
+    # button = guiref['exe']['confirm_button']
+    # guiref['exe']['confirm_button_text'].set("Confirm after JOG")
+    # button.config(state="normal", bg='orange')
+    # model.operator_confirm = False
+
+    # guiref['exe']['exe_status'].set("Paused")
+    # from robot_clamp_controller.run import ui_update_run_status
+    # while (True):
+    #     if model.operator_confirm:
+    #         button.config(state="disabled", bg='grey')
+    #         ui_update_run_status(guiref, model)
+    #         break
+    #     if model.run_status == RunStatus.STOPPED:
+    #         button.config(state="disabled", bg='grey')
+    #         ui_update_run_status(guiref, model)
+    #         return False
 
     ############################################
 
@@ -571,18 +593,30 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     future = send_and_wait_unless_cancel(model, rrc.GetRobtarget())
     if future.done:
         new_frame, new_ext_axes = future.value
-        logger_exe.info("Second Frame: %s, %s" % (new_frame, new_ext_axes))
-
+        logger_exe.info("Frame after Jog: %s" % (new_frame))
     else:
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (Second GetRobtarget future not arrived)")
         return False
 
+    future = send_and_wait_unless_cancel(model, rrc.GetJoints())
+    if future.done:
+        new_robot_joints, new_ext_axes = future.value
+        logger_exe.info("Joints after Jog: %s, %s" % (new_robot_joints, new_ext_axes))
+    else:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (Second GetRobtarget future not arrived)")
+        return False
     ############################################
 
     # Compute offset and apply to external axis.
     offset = Vector.from_start_end(movement.original_frame.point, new_frame.point)
-    logger_exe.info("Offset from jogging = %s (amount = %4g)" % (offset, offset.length))
+    logger_exe.info("Jogged Cartsian Offset = %s (amount = %4g mm)" % (offset, offset.length))
 
+    # Compute Joint 6 offset
+    end_state_robot_joints = to_degrees(movement.end_state['robot'].kinematic_config.values[3:10])
+    joint_6_offset = new_robot_joints[5] - end_state_robot_joints[5]
+    logger_exe.info("Jogged joint 6 offset = %s deg" % (joint_6_offset))
+
+    # YZ axis of external axis has flipped direction
     guiref['offset']['Ext_X'].set("%.4g" % round(offset.x, 4))
     guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * offset.y, 4))
     guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * offset.z, 4))
@@ -591,26 +625,29 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     guiref['offset']['Rob_J3'].set("0")
     guiref['offset']['Rob_J4'].set("0")
     guiref['offset']['Rob_J5'].set("0")
-    guiref['offset']['Rob_J6'].set("0")
-
-    ext_axes_with_offset = apply_ext_offsets(guiref, original_ext_axes)
+    guiref['offset']['Rob_J6'].set("%.4g" % round(joint_6_offset, 4))
 
     # Movement to make sure joints have no offset
     # Ask user to jog from TP and Stop Excution
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Offset registered: X %.3g Y %.3g Z %.3g." % (offset.x, offset.y, offset.z)], []))
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Press PLAY to accept with a gantry move."], []))
-
+    logger_exe.info("rrc.stop() issued")
     future = send_and_wait_unless_cancel(model, rrc.Stop())
     if not future.done:
+        logger_exe.info("rrc.stop() returned")
         logger_exe.warn("OperatorAddJogOffset Stopped before completion (rrc.Stop future not arrived)")
         return False
-    # future = send_and_wait_unless_cancel(model, rrc.MoveToJoints(movement.end_state['robot'], ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
-    # future = send_and_wait_unless_cancel(model, rrc.MoveToRobtarget(movement.original_frame, ext_axes_with_offset, 20, rrc.Zone.FINE, rrc.Motion.LINEAR))
-    # if future.done:
-    #     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
-    # else:
-    #     logger_exe.warn("OperatorAddJogOffset Stopped before completion (MoveToRobtarget future not arrived)")
-    #     return False
+
+    move_joint_instruction = robot_state_to_instruction(guiref, model, movement.end_state['robot'].kinematic_config, 30, rrc.Zone.FINE)
+    future = send_and_wait_unless_cancel(model, move_joint_instruction)
+
+    # Logging Gantry move is complete
+    if future.done:
+        model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
+        logger_exe.info("OperatorAddJogOffset gantry move is complete")
+    else:
+        logger_exe.warn("OperatorAddJogOffset Stopped before completion (MoveToRobtarget future not arrived)")
+        return False
 
     return True
 
@@ -788,6 +825,10 @@ def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement:
     align_Z = guiref['offset']['Visual_Z'].get()
 
     # Retrive the selected movement target frame
+    if not hasattr (movement, 'target_frame'):
+        logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
+
+        return False
     current_movement_target_frame = movement.target_frame
 
     from compas.geometry.transformations.transformation import Transformation
@@ -800,6 +841,7 @@ def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement:
     guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
     guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
     logger_model.info("Visual correction of Flange %s from Flange %s. Resulting in World %s" % (flange_vector, current_movement_target_frame, world_vector))
+    return True
 
 
 #########################
