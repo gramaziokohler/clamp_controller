@@ -138,10 +138,14 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
                 movement = model.movements[tree_row_id]
+                if not hasattr(movement, 'trajectory'):
+                    return True
                 max_start_number = len(movement.trajectory.points) - 1
                 popup = AlternativeStartPointWindow(guiref['root'], max_start_number)
                 guiref['root'].wait_window(popup.top)
                 n = popup.value
+                if n is None:
+                    return True
                 if n > max_start_number:
                     logger_bg.warm("Input number larger than number of trajectory points")
                     return True
