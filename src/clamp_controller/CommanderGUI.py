@@ -116,7 +116,7 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
             label_name = textvariable_name + "_label"
         ui_handles[label_name] = tk.Label(frame, textvariable=ui_handles[textvariable_name], font=tk.font_value)
         ui_handles[label_name].pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
+
 
     # Create the fields
     create_label_pair("addr", "addr")
@@ -212,6 +212,7 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="75%", command=lambda: on_power_button_click(75)).pack(side=tk.LEFT)
     tk.Button(frame, text="80%", command=lambda: on_power_button_click(80)).pack(side=tk.LEFT)
     tk.Button(frame, text="90%", command=lambda: on_power_button_click(90)).pack(side=tk.LEFT)
+    tk.Button(frame, text="99%", command=lambda: on_power_button_click(99)).pack(side=tk.LEFT)
 
     return ui_handles
 
