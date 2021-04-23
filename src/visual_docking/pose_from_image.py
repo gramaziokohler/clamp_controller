@@ -1,6 +1,6 @@
 import cv2
 
-from .aruco_markers import estimate_pose
+from aruco_markers import estimate_pose
 
 
 def get_frame_from_file(filename):
@@ -12,7 +12,7 @@ if __name__ == '__main__':
     import sys
 
     import matplotlib.pyplot as plt
-    
+
     if len(sys.argv) == 1:
         print('usage: python pose_from_image.py filename')
         sys.exit(-1)
