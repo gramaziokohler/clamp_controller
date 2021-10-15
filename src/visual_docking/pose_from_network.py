@@ -7,6 +7,7 @@ import numpy as np
 from compas.geometry import Transformation
 from compas_fab.backends import RosClient
 from roslibpy import Topic
+import urllib.request
 
 from aruco_markers import estimate_pose
 from aruco_markers import load_coefficients
@@ -22,9 +23,11 @@ if __name__ == '__main__':
 
     client = RosClient(args.ros_ip)
     client.run()
+    print ("ROS Connected")
 
     frames = Topic(client, '/camera_frames', 'std_msgs/String')
     frames.advertise()
+    print ("Topic Advertised")
 
     K, D = load_coefficients(args.calibration_file)
 
@@ -32,20 +35,15 @@ if __name__ == '__main__':
     ticks = 0
     marker_size = args.marker_size
     try:
+        # cv2 Video Capture does deal with the multipart jpeg stream.
         vcap = cv2.VideoCapture(args.url)
         while True:
-            _ret, frame = vcap.read()
+            _ret, frame = vcap.read() # Reads one of the multi part
 
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break
 
-            # if key & 0xFF == ord('c'):
-            #     ids, corners, rvecs, tvecs, marker_points, estimated_frames = estimate_pose(frame, marker_size, K, D)
-            #     if np.all(ids is not None):
-            #         print('Found {} markers'.format(len(ids)))
-            #         for i in range(len(ids)):
-            #             print(ids[i], rvecs[i], tvecs[i], corners[i].tolist())
             cv2.imshow('VideoStream', frame)
 
             ticks += 1
@@ -55,25 +53,33 @@ if __name__ == '__main__':
                     for i in range(len(ids)):
                         cv2.aruco.drawDetectedMarkers(frame, corners, ids)
                         cv2.aruco.drawAxis(frame, K, D, rvecs[i], tvecs[i], marker_size/2)
-                        if ids[i] == 23:
+                        if ids[i] == 25:
                             R, _jacobian = cv2.Rodrigues(rvecs[i])
-                            R.transpose()
+                            # print("rvecs: %s \n tvecs: %s \n R: %s" % (rvecs[i], tvecs[i], R))
+
                             r1, r2, r3 = R.tolist()
                             r1.append(tvecs[i][0, 0, 0])
                             r2.append(tvecs[i][0, 0, 1])
                             r3.append(tvecs[i][0, 0, 2])
                             T = [r1, r2, r3, [0, 0, 0, 1]]
+                            # T = T.inversed() # maybe this
                             T = Transformation.from_matrix(T)
+
+
                             print('{}'.format(T))
                             frames.publish({'data': json.dumps(T.to_data())})
 
             cv2.imshow('VideoStream', frame)
 
     finally:
-        if vcap:
-            vcap.release()
+        # if vcap:
+        #     vcap.release()
+        pass
 
     cv2.destroyAllWindows()
 
     frames.unadvertise()
     client.close()
+
+# Launched with arguments:
+# "args": ["--url", "http://192.168.1.2:80", "--calibration_file", "${workspaceFolder}/src//visual_docking/calibration_near_focus_800_600.yml", "--marker_size", "20.0", "--ros_ip", "192.168.1.4"]

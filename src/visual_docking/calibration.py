@@ -3,7 +3,7 @@ import argparse
 import cv2
 import numpy as np
 
-from .aruco_markers import save_coefficients
+from aruco_markers import save_coefficients
 
 # termination criteria
 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -31,7 +31,7 @@ def calibrate(url, square_size, width=9, height=6):
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break
-            
+
             if key & 0xFF == ord('c'):
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
