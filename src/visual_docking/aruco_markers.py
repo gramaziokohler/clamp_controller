@@ -3,9 +3,9 @@ import cv2.aruco
 import numpy as np
 
 
-def detect_markers(frame):
+def detect_markers(frame, aruco_dict = cv2.aruco.DICT_6X6_250):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
+    aruco_dict = cv2.aruco.Dictionary_get(aruco_dict)
     parameters =  cv2.aruco.DetectorParameters_create()
     parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
     corners, ids, _rejected_img_points = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
