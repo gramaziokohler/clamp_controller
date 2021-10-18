@@ -62,6 +62,29 @@ A class for calling the clamp function from a remote process via roslibpy and RO
 pip install -r requirements-dev.txt
 ```
 
+## Network Setup
+
+Multiple devices need to cooperate with each other during robotic execution. A number of networks are present to connect the devices to the control computer (which is my Laptop) running the Process Execution Controller. Below is a typical network configuration for the devices on the network.
+
+**Laptop (Ethernet Port)** - connection to RFL ethernet network (192.168.0.0/24 subnet)
+
+- Linux Virtual Machine running [ROS Master, ROS Bridge and ROS RRC_Driver](https://compas-rrc.github.io/compas_rrc/latest/reference/index.html) (192.168.0.117)
+- ABB Robot Controller running RRC
+- Routable Internet via ETH guest network
+
+**Laptop (Wireless Adapter)** - connection to ESP32 camera network (192.168.1.0/24 subnet)
+
+- 4 (or more) ESP32 cameras (192.168.1.100 to 192.168.1.103)
+
+**Laptop (USB COM Port)** - connection to USB Radio Dongle (proprietary network)
+
+- 4 Clamps (address 1-4)
+- 4 Screwdrivers (address 5-8)
+
+(there are alternative network setup possible, for example using USB-Ethernet Adapter for connecting to the Wireless AP)
+
+(the ROS instances can also be run from my Laptop's VMware Workstation Ubuntu 16 Virtual Machine bridged to the RFL network)
+
 ## Usage
 
 ### Controller with front end user interface:
