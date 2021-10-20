@@ -12,9 +12,11 @@
             "console": "integratedTerminal",
             "args": [
                 "--url", "http://192.168.0.160",
-                "--calibration_file", "${workspaceFolder}/src/visual_docking/calibration_near_focus_800_600.yml",
+                "--calibration_file", "${workspaceFolder}/src/visual_docking/cam1_70mm_1280_1024.yml",
                 "--marker_size", "10.0",
                 "--marker_spacing", "2.0",
+                "--markers_count_x", "4",
+                "--markers_count_y", "2",
                 "--ros_ip", "192.168.0.30"
             ]
         },
@@ -39,10 +41,10 @@
             "console": "integratedTerminal",
             "args": [
                 "--url", "http://192.168.0.160",
-                "--square_size", "4.15",
+                "--square_size", "4.0",
                 "--width", "8",
-                "--height", "5",
-                "--save_file", "calibration_near_focus_800_600.yml"]
+                "--height", "6",
+                "--save_file", "cam1_70mm_1280_1024.yml"]
         },
         {
             "name": "Pose from URL",

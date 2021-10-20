@@ -30,6 +30,7 @@ if __name__ == '__main__':
     print ("Topic Advertised")
 
     K, D = load_coefficients(args.calibration_file)
+    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
 
     ids = None
     ticks = 0
@@ -44,11 +45,9 @@ if __name__ == '__main__':
             if key & 0xFF == ord('q'):
                 break
 
-            cv2.imshow('VideoStream', frame)
-
             ticks += 1
             if ticks % 1000:
-                ids, corners, rvecs, tvecs, marker_points, estimated_frames = estimate_pose(frame, marker_size, K, D)
+                ids, corners, rvecs, tvecs, marker_points, estimated_frames = estimate_pose(frame, marker_size, K, D, aruco_dict)
                 if np.all(ids is not None):
                     for i in range(len(ids)):
                         cv2.aruco.drawDetectedMarkers(frame, corners, ids)

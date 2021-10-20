@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import ast
 
 import cv2
 import numpy as np
@@ -9,16 +10,21 @@ from compas_fab.backends import RosClient
 from roslibpy import Topic
 import urllib.request
 
-from aruco_markers import estimate_pose, detect_markers
-from aruco_markers import load_coefficients
+from aruco_markers import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
     parser.add_argument('--url', type=str, required=True, help='url of the camera stream')
     parser.add_argument('--calibration_file', type=str, required=True, help='YML file to load calibration matrices')
-    parser.add_argument('--marker_size', type=float, required=True, help='Real size of the printed marker')
-    parser.add_argument('--marker_spacing', type=float, required=True, help='Spacing between markers')
+
+    parser.add_argument('--dictionary_name', type=str, default="DICT_4X4_50", help='Name of aruco dictionary, default DICT_4X4_50')
+    parser.add_argument('--markers_count_x', type=int, default=4, help='Name of aruco dictionary, default DICT_4X4_50')
+    parser.add_argument('--markers_count_y', type=int, default=2, help='Name of aruco dictionary, default DICT_4X4_50')
+    parser.add_argument('--marker_size', type=float, required=True, help='Real size of the printed marker (convention is mm)')
+    parser.add_argument('--marker_spacing', type=float, required=True, help='Spacing between markers (convention is mm)')
     parser.add_argument('--ros_ip', type=str, default='localhost', required=False, help='IP address of the ROS network')
+
+    parser.add_argument('--output_board', action='store_true',  help='If set, a png image of the ArUco Board will be saved.')
 
     args = parser.parse_args()
 
@@ -26,58 +32,70 @@ if __name__ == '__main__':
     client.run()
     print ("ROS Connected")
 
-    frames = Topic(client, '/camera_frames', 'std_msgs/String')
-    frames.advertise()
+    ros_topic = Topic(client, '/camera_frames', 'std_msgs/String')
+    ros_topic.advertise()
     print ("Topic Advertised")
 
     K, D = load_coefficients(args.calibration_file)
-    dictionary_name  = cv2.aruco.DICT_4X4_50
-    board = cv2.aruco.GridBoard_create(6, 4, args.marker_size, args.marker_spacing, cv2.aruco.Dictionary_get(dictionary_name))
-    img = board.draw((650,430))
-    cv2.imwrite("DICT_4X4_50_6x4_10_1.png", img)
-    cv2.imshow("DICT_4X4_50_6x4_10_1", img)
-    cv2.waitKey(0)
 
-    ids = None
-    ticks = 0
-    marker_size = args.marker_size
+    # Generate and save image of board
+    dictionary_name = args.dictionary_name
+    markers_count_x, markers_count_y = args.markers_count_x, args.markers_count_y # 4x3 [Toolchanger Docker], 3x1 [Clamp to Joint]
+
+    board = load_aruco_board(args.dictionary_name, args.markers_count_x, args.markers_count_y, args.marker_size, args.marker_spacing)
+
+    if args.output_board:
+        resolution_per_mm = 20
+        save_aruco_board(board, args.marker_size, args.marker_spacing, resolution_per_mm)
+
     try:
         # cv2 Video Capture does deal with the multipart jpeg stream.
         vcap = cv2.VideoCapture(args.url)
         while True:
-            _ret, frame = vcap.read() # Reads one of the multi part
+            _ret, frame = vcap.read() # Reads one JPEG of the M-JPEG stream
 
+            # * Open CV style quit mechanism
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break
 
-            cv2.imshow('VideoStream', frame)
+            ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
 
-            ticks += 1
-            if ticks % 1000:
-                ids, corners, frame_with_markers = detect_markers(frame, dictionary_name)
+            # *See *Refine marker detection* in https://docs.opencv.org/3.4.15/db/da9/tutorial_aruco_board_detection.html
+            cv2.aruco.refineDetectedMarkers(frame, board, corners, ids, rejected_img_points)
 
-                if np.all(ids is not None):
-                    rvec, tvec, marker_points = [], [], []
-                    rvec = np.zeros((3,1))
-                    tvec = np.zeros((3,1))
-                    estimated_frames = None
-                    retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, rvec, tvec)
+            # * Check if any marker is detected
+            if np.all(ids is not None):
 
-                    # colorFrame = cv2.aruco.drawDetectedMarkers(colorFrame, corners, ids)
-                    if(retval):
-                        cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, marker_size/2 )
+                # * Draw individual marker square
+                frame_with_markers = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
+                # * Estimate pose of Aruco Board
+                retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, np.zeros((3,1)), np.zeros((3,1)))
 
-            cv2.imshow('VideoStream', frame_with_markers)
+                # * retval is the number of markers detected on the board
+                if(retval):
+                    cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, args.marker_size )
+                    # * Convert rvec and tvec to transformation and publish to ros_topic
+                    T = transformation_from_rvec_tvec(rvec, tvec)
+                    ros_topic.publish({'data': json.dumps(T.to_data())})
+
+                # Change frame to the one drawn with markers
+                frame = frame_with_markers
+            else:
+                retval = 0
+
+            resized_frame = cv2.resize(frame, (800,600), interpolation = cv2.INTER_AREA)
+            resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
+            resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
+            cv2.imshow('VideoStream', resized_frame)
 
     finally:
-        # if vcap:
-        #     vcap.release()
-        pass
+        if vcap:
+            vcap.release()
+        # pass
 
     cv2.destroyAllWindows()
-
-    frames.unadvertise()
+    ros_topic.unadvertise()
     client.close()
 
 # Launched with arguments:
