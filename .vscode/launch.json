@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--url", "http://192.168.0.160",
-                "--calibration_file", "${workspaceFolder}/src/visual_docking/cam1_70mm_1280_1024.yml",
+                "--calibration_file", "${workspaceFolder}/src/visual_docking/calibrations/cam1_70mm_1600_1200.yml",
                 "--marker_size", "10.0",
                 "--marker_spacing", "2.0",
                 "--markers_count_x", "4",
@@ -21,14 +21,14 @@
             ]
         },
         {
-            "name": "Pose from Network",
+            "name": "Marker Pose from Network",
             "type": "python",
             "request": "launch",
             "program": "src/visual_docking/pose_from_network.py",
             "console": "integratedTerminal",
             "args": [
                 "--url", "http://192.168.0.160",
-                "--calibration_file", "${workspaceFolder}/src/visual_docking/calibration_near_focus_800_600.yml",
+                "--calibration_file", "${workspaceFolder}/src/visual_docking/calibrations/cam1_70mm_1600_1200.yml",
                 "--marker_size", "20.0",
                 "--ros_ip", "192.168.0.30"
             ]
@@ -44,15 +44,7 @@
                 "--square_size", "4.0",
                 "--width", "8",
                 "--height", "6",
-                "--save_file", "cam1_70mm_1280_1024.yml"]
-        },
-        {
-            "name": "Pose from URL",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "args": ["http://192.168.1.2", "--calibration_file", "calibration_1280x720.yml", "--marker_size", "20.0", "--ros_ip", "192.168.1.4"]
+                "--save_file", "cam1_70mm_1600_1200.yml"]
         },
         {
             "name": "Clamp Controller Main with process",
