@@ -11,13 +11,13 @@
             "program": "src/visual_docking/aruco_board_pose_from_network.py",
             "console": "integratedTerminal",
             "args": [
-                "--url", "http://192.168.0.160",
+                "--url", "http://192.168.1.100",
                 "--calibration_file", "${workspaceFolder}/src/visual_docking/calibrations/cam1_70mm_1600_1200.yml",
                 "--marker_size", "10.0",
                 "--marker_spacing", "2.0",
                 "--markers_count_x", "4",
                 "--markers_count_y", "2",
-                "--ros_ip", "192.168.0.30"
+                "--ros_ip", "192.168.1.2"
             ]
         },
         {
