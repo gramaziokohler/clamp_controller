@@ -1,7 +1,6 @@
 import argparse
 import json
-import sys
-import ast
+import time
 
 import cv2
 import numpy as np
@@ -48,10 +47,15 @@ if __name__ == '__main__':
         resolution_per_mm = 20
         save_aruco_board(board, args.marker_size, args.marker_spacing, resolution_per_mm)
 
+    def put_text(frame, text, org):
+        frame = cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
+        return cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
+
     try:
         # cv2 Video Capture does deal with the multipart jpeg stream.
         vcap = cv2.VideoCapture(args.url)
         while True:
+            start = time.time()
             _ret, frame = vcap.read() # Reads one JPEG of the M-JPEG stream
 
             # * Open CV style quit mechanism
@@ -85,8 +89,11 @@ if __name__ == '__main__':
                 retval = 0
 
             resized_frame = cv2.resize(frame, (800,600), interpolation = cv2.INTER_AREA)
-            resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
-            resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
+            put_text(resized_frame, '%i Markers' % retval, (20,580))
+            # resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
+            # resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
+            fps = 1 / (time.time() - start)
+            put_text(resized_frame, '%.1fFPS' % fps, (20,40))
             cv2.imshow('VideoStream', resized_frame)
 
     finally:
