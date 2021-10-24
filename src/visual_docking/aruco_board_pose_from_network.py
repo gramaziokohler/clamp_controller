@@ -11,6 +11,47 @@ import urllib.request
 
 from aruco_markers import *
 
+import queue
+import threading
+
+# bufferless VideoCapture
+class VideoCapture:
+
+    def __init__(self, name):
+        self.cap = cv2.VideoCapture(name)
+        self.lock = threading.Lock()
+        self.tick=0
+        self.buffer = None
+        t = threading.Thread(target=self._reader)
+        t.daemon = True
+        t.start()
+
+  # read frames as soon as they are available, keeping only most recent one
+    def _reader(self):
+        while True:
+            print("Reading frame after %i"%self.tick)
+            start = time.time()
+            ret, frame = self.cap.read()
+            print("Frame %i arrived after %.2f"% (self.tick, (time.time() - start)))
+            start = time.time()
+            self.lock.acquire()
+            if self.buffer is not None:
+                print ("Frame %i Discarded" % self.tick)
+            self.buffer = frame
+            self.lock.release()
+            self.tick +=1
+            print("Frame %i stored after %.2f"% (self.tick, (time.time() - start)))
+
+    def read(self):
+        while self.buffer is None:
+            pass
+        self.lock.acquire()
+        frame = self.buffer.copy()
+        self.buffer = None # Remove the frame from buffer
+        self.lock.release()
+        time.sleep(0.5)
+        return frame
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
     parser.add_argument('--url', type=str, required=True, help='url of the camera stream')
@@ -50,55 +91,53 @@ if __name__ == '__main__':
     def put_text(frame, text, org):
         frame = cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
         return cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
-
-    try:
+    
+    # try:
         # cv2 Video Capture does deal with the multipart jpeg stream.
-        vcap = cv2.VideoCapture(args.url)
-        while True:
-            start = time.time()
-            _ret, frame = vcap.read() # Reads one JPEG of the M-JPEG stream
+    vcap = VideoCapture(args.url)
+    retval = 0
+    while True:
+        start = time.time()
+        frame = vcap.read() # Reads one JPEG of the M-JPEG stream
 
-            # * Open CV style quit mechanism
-            key = cv2.waitKey(1)
-            if key & 0xFF == ord('q'):
-                break
+        # * Open CV style quit mechanism
+        key = cv2.waitKey(1)
+        if key & 0xFF == ord('q'):
+            break
 
-            ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
+        ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
 
-            # *See *Refine marker detection* in https://docs.opencv.org/3.4.15/db/da9/tutorial_aruco_board_detection.html
-            cv2.aruco.refineDetectedMarkers(frame, board, corners, ids, rejected_img_points)
+        # *See *Refine marker detection* in https://docs.opencv.org/3.4.15/db/da9/tutorial_aruco_board_detection.html
+        cv2.aruco.refineDetectedMarkers(frame, board, corners, ids, rejected_img_points)
 
-            # * Check if any marker is detected
-            if np.all(ids is not None):
+        # * Check if any marker is detected
+        if np.all(ids is not None):
 
-                # * Draw individual marker square
-                frame_with_markers = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
-                # * Estimate pose of Aruco Board
-                retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, np.zeros((3,1)), np.zeros((3,1)))
+            # * Draw individual marker square
+            frame_with_markers = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
+            # * Estimate pose of Aruco Board
+            retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, np.zeros((3,1)), np.zeros((3,1)))
 
-                # * retval is the number of markers detected on the board
-                if(retval):
-                    cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, args.marker_size )
-                    # * Convert rvec and tvec to transformation and publish to ros_topic
-                    T = transformation_from_rvec_tvec(rvec, tvec)
-                    ros_topic.publish({'data': json.dumps(T.to_data())})
+            # * retval is the number of markers detected on the board
+            if(retval):
+                cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, args.marker_size )
+                # * Convert rvec and tvec to transformation and publish to ros_topic
+                T = transformation_from_rvec_tvec(rvec, tvec)
+                ros_topic.publish({'data': json.dumps(T.to_data())})
 
-                # Change frame to the one drawn with markers
-                frame = frame_with_markers
-            else:
-                retval = 0
+            # Change frame to the one drawn with markers
+            frame = frame_with_markers
 
-            resized_frame = cv2.resize(frame, (800,600), interpolation = cv2.INTER_AREA)
-            put_text(resized_frame, '%i Markers' % retval, (20,580))
-            # resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
-            # resized_frame = cv2.putText(resized_frame, '#%i' % retval, (20,580), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
-            fps = 1 / (time.time() - start)
-            put_text(resized_frame, '%.1fFPS' % fps, (20,40))
-            cv2.imshow('VideoStream', resized_frame)
 
-    finally:
-        if vcap:
-            vcap.release()
+        resized_frame = cv2.resize(frame, (800,600), interpolation = cv2.INTER_AREA)
+        put_text(resized_frame, '%i Markers' % retval, (20,580))
+        fps = 1 / (time.time() - start)
+        put_text(resized_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20,40))
+        cv2.imshow('VideoStream', resized_frame)
+
+    # finally:
+    #     if vcap.cap:
+    #         vcap.cap.release()
         # pass
 
     cv2.destroyAllWindows()
