@@ -15,39 +15,72 @@ import queue
 import threading
 
 # bufferless VideoCapture
+
+
 class VideoCapture:
 
     def __init__(self, name):
-        self.cap = cv2.VideoCapture(name)
-        self.lock = threading.Lock()
-        self.tick=0
+        self.name = name
+        self.cap = cv2.VideoCapture(self.name)
+        self.frame_lock = threading.Lock()
+        self.capture_lock = threading.Lock()
+        self.tick = 0
         self.buffer = None
-        t = threading.Thread(target=self._reader)
-        t.daemon = True
-        t.start()
+        self.terminate = False
+        self.reader_thread = threading.Thread(target=self._reader)
+        self.reader_thread.daemon = True
+        self.reader_thread.start()
 
   # read frames as soon as they are available, keeping only most recent one
     def _reader(self):
         while True:
-            print("Reading frame after %i"%self.tick)
+            print("Reading frame after %i" % self.tick)
             start = time.time()
-            ret, frame = self.cap.read()
-            print("Frame %i arrived after %.2f"% (self.tick+1, (time.time() - start)))
-            self.lock.acquire()
+
+            if self.terminate:
+                print("Reader thread is terminated")
+                return
+
+            self.capture_lock.acquire()
+            grab_success = self.cap.grab()
+            if not grab_success:
+                self.capture_lock.release()
+                continue
+            success, frame = self.cap.retrieve()
+            self.capture_lock.release()
+
+            print("Frame %i arrived after %.2f" % (self.tick+1, (time.time() - start)))
+
+            if self.terminate:
+                print("Reader thread is terminated")
+                return
+
+            self.frame_lock.acquire()
             if self.buffer is not None:
-                print ("Frame %i Discarded" % self.tick)
+                print("Frame %i Discarded" % self.tick)
             self.buffer = frame
-            self.lock.release()
-            self.tick +=1
+            self.frame_lock.release()
+            self.tick += 1
 
     def read(self):
         while self.buffer is None:
-            pass
-        self.lock.acquire()
+            return False, None
+        self.frame_lock.acquire()
         frame = self.buffer.copy()
-        self.buffer = None # Remove the frame from buffer
-        self.lock.release()
-        return frame
+        self.buffer = None  # Remove the frame from buffer
+        self.frame_lock.release()
+        return True, frame
+
+    def restart(self):
+        self.capture_lock.acquire()
+        print("restart will now stop currect Video Capture")
+        if self.cap:
+            self.cap.release()
+            time.sleep(0.5)
+        print("restart will now start new Video Capture")
+        self.cap = cv2.VideoCapture(self.name)
+        self.capture_lock.release()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
@@ -67,17 +100,17 @@ if __name__ == '__main__':
 
     client = RosClient(args.ros_ip)
     client.run()
-    print ("ROS Connected")
+    print("ROS Connected")
 
     ros_topic = Topic(client, '/camera_frames', 'std_msgs/String')
     ros_topic.advertise()
-    print ("Topic Advertised")
+    print("Topic Advertised")
 
     K, D = load_coefficients(args.calibration_file)
 
     # Generate and save image of board
     dictionary_name = args.dictionary_name
-    markers_count_x, markers_count_y = args.markers_count_x, args.markers_count_y # 4x3 [Toolchanger Docker], 3x1 [Clamp to Joint]
+    markers_count_x, markers_count_y = args.markers_count_x, args.markers_count_y  # 4x3 [Toolchanger Docker], 3x1 [Clamp to Joint]
 
     board = load_aruco_board(args.dictionary_name, args.markers_count_x, args.markers_count_y, args.marker_size, args.marker_spacing)
 
@@ -86,21 +119,36 @@ if __name__ == '__main__':
         save_aruco_board(board, args.marker_size, args.marker_spacing, resolution_per_mm)
 
     def put_text(frame, text, org):
-        frame = cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2, cv2.LINE_AA)
-        return cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 1, cv2.LINE_AA)
+        frame = cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2, cv2.LINE_AA)
+        return cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
 
     # try:
         # cv2 Video Capture does deal with the multipart jpeg stream.
     vcap = VideoCapture(args.url)
     retval = 0
+    last_capture_time = time.time()
     while True:
-        start = time.time()
-        frame = vcap.read() # Reads one JPEG of the M-JPEG stream
+        success, frame = vcap.read()  # Reads one JPEG of the M-JPEG stream
 
         # * Open CV style quit mechanism
         key = cv2.waitKey(1)
         if key & 0xFF == ord('q'):
             break
+
+        # * Restart Camera Mechanism
+        if key & 0xFF == ord('r'):
+            print("Restarting Camera Stream")
+            vcap.restart()
+            continue
+
+        # Skip Remaining loop if no new frame
+        if not success:
+            unsuccessful_time = (time.time() - last_capture_time)
+            if unsuccessful_time > 3.0:
+                print("No frame in 3 secs. Connection probably lost. Attempt to restart connection.")
+                vcap.restart()
+                last_capture_time = time.time()
+            continue
 
         ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
 
@@ -113,11 +161,11 @@ if __name__ == '__main__':
             # * Draw individual marker square
             frame_with_markers = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
             # * Estimate pose of Aruco Board
-            retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, np.zeros((3,1)), np.zeros((3,1)))
+            retval, rvec, tvec = cv2.aruco.estimatePoseBoard(corners, ids, board, K, D, np.zeros((3, 1)), np.zeros((3, 1)))
 
             # * retval is the number of markers detected on the board
             if(retval):
-                cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, args.marker_size )
+                cv2.aruco.drawAxis(frame_with_markers, K, D, rvec, tvec, args.marker_size)
                 # * Convert rvec and tvec to transformation and publish to ros_topic
                 T = transformation_from_rvec_tvec(rvec, tvec)
                 ros_topic.publish({'data': json.dumps(T.to_data())})
@@ -125,12 +173,14 @@ if __name__ == '__main__':
             # Change frame to the one drawn with markers
             frame = frame_with_markers
 
-
-        resized_frame = cv2.resize(frame, (640,480), interpolation = cv2.INTER_AREA)
-        put_text(resized_frame, '%i Markers' % retval, (20,440))
-        fps = 1 / (time.time() - start)
-        put_text(resized_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20,40))
+        resized_frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_AREA)
+        put_text(resized_frame, '%i Markers' % retval, (20, 440))
+        fps = 1 / (time.time() - last_capture_time)
+        put_text(resized_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20, 40))
         cv2.imshow('VideoStream', resized_frame)
+
+        # New start time
+        last_capture_time = time.time()
 
     # finally:
     #     if vcap.cap:
