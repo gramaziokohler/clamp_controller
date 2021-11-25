@@ -96,6 +96,8 @@ def save_coefficients(mtx, dist, path):
 def load_coefficients(path):
     """ Loads camera matrix and distortion coefficients. """
     # FILE_STORAGE_READ
+    import os
+    assert os.path.exists(path)
     cv_file = cv2.FileStorage(path, cv2.FILE_STORAGE_READ)
 
     # note we also have to specify the type to retrieve other wise we only get a

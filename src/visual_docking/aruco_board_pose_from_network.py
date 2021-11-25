@@ -90,7 +90,7 @@ class VideoCapture:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
     parser.add_argument('--url', default='http://192.168.1.101', type=str, required=False, help='url of the camera stream')
-    parser.add_argument('--calibration_file', default='calibration_1280x720.yml', type=str, required=False, help='YML file to load calibration matrices')
+    parser.add_argument('--calibration_file', default='src/visual_docking/calibrations/cam1_70mm_1600_1200.yml', type=str, required=False, help='YML file to load calibration matrices')
 
     parser.add_argument('--dictionary_name', type=str, default="DICT_4X4_50", help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--markers_count_x', type=int, default=4, help='Name of aruco dictionary, default DICT_4X4_50')
