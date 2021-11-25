@@ -42,7 +42,7 @@ class VideoCapture:
             start = time.time()
 
             if self.terminate:
-                print("Reader thread is terminated by self.terminate flag")
+                print("Reader thread is terminated by self.terminate flag. (Before cap.read()")
                 self.terminate = False
                 cap.release()
                 return
@@ -51,13 +51,16 @@ class VideoCapture:
             success, frame = cap.read()
             self.capture_lock.release()
 
-            print("Frame %i arrived after %.2f" % (self.tick+1, (time.time() - start)))
+            print("Frame %i arrived after %.2f. Success = %s" % (self.tick+1, (time.time() - start), success))
+            if not success:
+                continue
 
             if self.terminate:
-                print("Reader thread is terminated")
+                print("Reader thread is terminated by self.terminate flag. (After cap.read()")
                 self.terminate = False
                 cap.release()
                 return
+
 
             self.frame_lock.acquire()
             if self.buffer is not None:
