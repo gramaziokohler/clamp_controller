@@ -103,20 +103,57 @@ class SerialCommander(object):
         clamp.last_comm_latency = 0
         self.clamps[clamp.receiver_address] = clamp
 
-    def update_all_clamps_status(self, retry: int = 0, time_out_millis: int = 40):
+
+    def check_status_update_freq(self):
+        """ Start or stop high frequency updates.
+        Based on if any clamps are running."""
+
+        if not self.status_update_high_freq:
+            # * Logic to turn high freq ON
+            if any([clamp.isMotorRunning for clamp in self.clamps.values()]):
+                self.status_update_high_freq = True
+                self.logger.info("Clamps started moving. Status Update Freq = High")
+            pass
+        else:
+            # * Logic to turn high freq OFF
+            if not any([clamp.isMotorRunning for clamp in self.clamps.values()]):
+                self.status_update_high_freq = False
+                self.logger.info("All clamps have stopped. Status Update Freq = Low")
+
+    def update_all_clamps_status(self, retry: int = 0, time_out_millis: int = 40) -> List[ClampModel]:
         """ Update the status of all clamps.
-        Returns a list of boolean that represent whether update is a success
+        Returns a list of clamps that have been successfully updated
         """
         results = []
-        for address, clamp in self.clamps.items():
-            result = self.update_clamp_status(clamp, retry=retry, time_out_millis=time_out_millis)
-            results.append(result)
+        for clamp in self.clamps.values():
+            success = self.update_clamp_status(clamp, retry=retry, time_out_millis=time_out_millis)
+            if success:
+                results.append(clamp)
 
-        # Stop high frequency updates if all clamps have stopped
-        if self.status_update_high_freq and not any([clamp.isMotorRunning for clamp in self.clamps.values()]):
-            self.status_update_high_freq = False
-            self.logger.info("All clamps have stopped. Status Update Freq = Low")
+        self.check_status_update_freq()
         return results
+
+    def update_active_clamps_status(self, retry: int = 0, time_out_millis: int = 40) -> List[ClampModel]:
+        """ Update the status of all active (isMotorRunning) clamps.
+        Returns a list of clamps that have been successfully updated
+        """
+        results = []
+
+
+        if self.sync_move_inaction:
+            active_clamps = [clamp for (clamp,pos,velo) in self.sync_move_clamp_pos_velo_list]
+        else:
+            active_clamps = [clamp for clamp in self.clamps.values() if clamp.isMotorRunning]
+
+        for clamp in self.clamps.values():
+            if clamp in active_clamps:
+                success = self.update_clamp_status(clamp, retry=retry, time_out_millis=time_out_millis)
+                if success:
+                    results.append(clamp)
+
+        self.check_status_update_freq()
+        return results
+
 
     def update_clamp_status(self, clamp: ClampModel, retry: int = 0, time_out_millis: int = 40) -> bool:
         """ Update the status of one clamp

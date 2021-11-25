@@ -7,18 +7,23 @@ class ClampModel(object):
 
     def __init__(
         self,
+        processName: str = 'c1',
+        typeName: str = 'CLX',
         receiver_address: str = 'b',
         StepPerMM: float = 200.0,
         JawOffset: float = 0.0,  # (in mmm) / Jaw Position = Offset +  (_raw_currentPosition /  StepPerMM)
         SoftLimitMin_mm: float = -0.1,
         SoftLimitMax_mm: float = 100,
         BattMin: float = 0.0,
-        BattMax: float = 1024.0
+        BattMax: float = 1024.0,
+
     ):
 
         assert type(receiver_address) == str
         assert len(receiver_address) == 1
         self._receiver_address = receiver_address
+        self.processName = processName
+        self.typeName = typeName
 
         # High level mointoring configurations for the clamp (# Settings of the controller)
         self.StepPerMM: float = StepPerMM
@@ -57,35 +62,35 @@ class ClampModel(object):
 
     # Read only properities
 
-    """Returns the Motor Position Raw Value in steps  """
     @property
-    def currentMotorPosition(self):
+    def currentMotorPosition(self) -> int:
+        """Returns the Motor Position Raw Value in steps  """
         if self._raw_currentPosition is None:
             return None
         return self._raw_currentPosition
 
-    """Returns the Jaw Position in mm (Offset Included) """
     @property
-    def currentJawPosition(self):
+    def currentJawPosition(self) -> float:
+        """Returns the Jaw Position in mm (Offset Included) """
         if self._raw_currentPosition is None:
             return None
         return self.to_jaw_position(self._raw_currentPosition)
 
-    """Returns the Motor Position Target that is set by PID Controller """
     @property
-    def currentMotorTarget(self):
+    def currentMotorTarget(self) -> float:
+        """Returns the Motor Position Target that is set by PID Controller """
         if self._raw_currentTarget is None:
             return None
         return self._raw_currentTarget / self.StepPerMM
 
-    """Returns the Motor Power Input that is set by PID Controller """
     @property
-    def currentMotorPowerPercentage(self):
+    def currentMotorPowerPercentage(self) -> float:
+        """Returns the Motor Power Input that is set by PID Controller """
         return self._raw_currentMotorPowerPercentage
 
-    """Returns the Battery Percentage (offset included) """
     @property
-    def batteryPercentage(self) -> int:
+    def batteryPercentage(self) -> float:
+        """Returns the Battery Percentage (offset included) """
         if self._raw_battery is None:
             return None
         return int((self._raw_battery - self.BattMin) / (self.BattMax - self.BattMin) * 100)
@@ -108,6 +113,7 @@ class ClampModel(object):
 
     @property
     def state_to_data(self):
+        """Function to serialize the device state into a dictionary that is serializible and passable over ROS"""
         data = {}
         data['state_timestamp'] = self._state_timestamp
         data['raw_currentPosition'] = self._raw_currentPosition

@@ -7,6 +7,7 @@ from tkinter import ttk
 from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
+from clamp_controller.ScrewdriverModel import ScrewdriverModel
 from serial.tools import list_ports
 
 logger_ui = logging.getLogger("app.UI")
@@ -101,8 +102,8 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    font_key = tkFont.Font(family="Lucida Grande", size=10)
-    font_value = tkFont.Font(family="Lucida Grande", size=20)
+    tk.font_key = tkFont.Font(family="Lucida Grande", size=8)
+    tk.font_value = tkFont.Font(family="Lucida Grande", size=16)
 
     tk.Label(frame, text="com?", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
     ui_handles['checkbox'] = tk.BooleanVar(value=True)
@@ -121,6 +122,10 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     # Create the fields
     create_label_pair("addr", "addr")
     ui_handles["addr"].set(clamp.receiver_address)
+    create_label_pair("id", "id")
+    ui_handles["id"].set(clamp.processName)
+    create_label_pair("type", "type")
+    ui_handles["type"].set(clamp.typeName)
     create_label_pair("home", "home")
     create_label_pair("motion", "motion")
     create_label_pair("pos", "position")
@@ -130,6 +135,10 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     create_label_pair("last_com", "last_com")
     create_label_pair("last_pos", "last_pos")
     create_label_pair("last_vel", "last_vel")
+
+    if isinstance(clamp, ScrewdriverModel):
+        create_label_pair("grip", "grip")
+        create_label_pair("g_status", "g_status")
     return ui_handles
 
 
