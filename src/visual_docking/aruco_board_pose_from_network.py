@@ -111,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument('--marker_size', default=10.0, type=float, help='Real size of the printed marker')
     parser.add_argument('--marker_spacing', default=2.0, type=float, help='Spacing between markers (convention is mm)')
     parser.add_argument('--ros_ip', type=str, default='192.168.1.2', help='IP address of the ROS network')
+    parser.add_argument('--ros_topic', type=str, default='frame_cam_1', help='IP address of the ROS network')
 
     parser.add_argument('--output_board', action='store_true',  help='If set, a png image of the ArUco Board will be saved.')
 
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     client.run()
     print("ROS Connected")
 
-    ros_topic = Topic(client, '/camera_frames', 'std_msgs/String')
+    ros_topic = Topic(client, args.ros_topic, 'std_msgs/String')
     ros_topic.advertise()
     print("Topic Advertised")
 
@@ -196,7 +197,7 @@ if __name__ == '__main__':
         put_text(resized_frame, '%i Markers' % retval, (20, 440))
         fps = 1 / (time.time() - last_capture_time)
         put_text(resized_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20, 40))
-        cv2.imshow('VideoStream', resized_frame)
+        cv2.imshow('%s -> %s' % (args.url, args.ros_topic), resized_frame)
 
         # New start time
         last_capture_time = time.time()
