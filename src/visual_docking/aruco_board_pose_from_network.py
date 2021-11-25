@@ -21,12 +21,6 @@ class VideoCapture:
 
     def __init__(self, name):
         self.name = name
-
-        print("Initiating cv2.VideoCapture")
-
-        self.cap = cv2.VideoCapture(self.name, cv2.CAP_VFW )
-        print("Finished initiating cv2.VideoCapture")
-
         self.frame_lock = threading.Lock()
         self.capture_lock = threading.Lock()
         self.tick = 0
@@ -38,26 +32,31 @@ class VideoCapture:
 
   # read frames as soon as they are available, keeping only most recent one
     def _reader(self):
+
+        print("Initiating cv2.VideoCapture")
+        cap = cv2.VideoCapture(self.name)
+        print("Finished initiating cv2.VideoCapture")
+
         while True:
             print("Reading frame after %i" % self.tick)
             start = time.time()
 
             if self.terminate:
-                print("Reader thread is terminated")
+                print("Reader thread is terminated by self.terminate flag")
+                self.terminate = False
+                cap.release()
                 return
 
             self.capture_lock.acquire()
-            grab_success = self.cap.grab()
-            if not grab_success:
-                self.capture_lock.release()
-                continue
-            success, frame = self.cap.retrieve()
+            success, frame = cap.read()
             self.capture_lock.release()
 
             print("Frame %i arrived after %.2f" % (self.tick+1, (time.time() - start)))
 
             if self.terminate:
                 print("Reader thread is terminated")
+                self.terminate = False
+                cap.release()
                 return
 
             self.frame_lock.acquire()
@@ -77,19 +76,30 @@ class VideoCapture:
         return True, frame
 
     def restart(self):
-        self.capture_lock.acquire()
         print("restart will now stop currect Video Capture")
-        if self.cap:
-            self.cap.release()
-            time.sleep(0.5)
+        self.terminate = True
+        time.sleep(1)
+        # if self.cap:
+        #     self.cap.release()
+        #     time.sleep(0.5)
+        # try:
+        #     self.reader_thread._stop()
+        # except Exception:
+        #     print ("self.reader_thread._stop() failed")
+        self.reader_thread.join()
+        # self.reader_thread._stop()
+
         print("restart will now start new Video Capture")
-        self.cap = cv2.VideoCapture(self.name)
-        self.capture_lock.release()
+        self.terminate = False
+        self.reader_thread = threading.Thread(target=self._reader)
+        self.reader_thread.daemon = True
+        self.reader_thread.start()
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
-    parser.add_argument('--url', default='http://192.168.1.101', type=str, required=False, help='url of the camera stream')
+    parser.add_argument('--url', default='http://192.168.1.100', type=str, required=False, help='url of the camera stream')
     parser.add_argument('--calibration_file', default='src/visual_docking/calibrations/cam1_70mm_1600_1200.yml', type=str, required=False, help='YML file to load calibration matrices')
 
     parser.add_argument('--dictionary_name', type=str, default="DICT_4X4_50", help='Name of aruco dictionary, default DICT_4X4_50')
@@ -132,6 +142,7 @@ if __name__ == '__main__':
     vcap = VideoCapture(args.url)
     retval = 0
     last_capture_time = time.time()
+    reconnect_timeout = 5.0
     while True:
         success, frame = vcap.read()  # Reads one JPEG of the M-JPEG stream
 
@@ -149,8 +160,8 @@ if __name__ == '__main__':
         # Skip Remaining loop if no new frame
         if not success:
             unsuccessful_time = (time.time() - last_capture_time)
-            if unsuccessful_time > 3.0:
-                print("No frame in 3 secs. Connection probably lost. Attempt to restart connection.")
+            if unsuccessful_time > reconnect_timeout:
+                print("No frame in %s secs. Connection probably lost. Attempt to restart connection." % (reconnect_timeout))
                 vcap.restart()
                 last_capture_time = time.time()
             continue
