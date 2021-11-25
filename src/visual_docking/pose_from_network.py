@@ -14,10 +14,10 @@ from aruco_markers import load_coefficients
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
-    parser.add_argument('--url', type=str, required=True, help='url of the camera stream')
-    parser.add_argument('--calibration_file', type=str, required=True, help='YML file to load calibration matrices')
-    parser.add_argument('--marker_size', type=float, required=True, help='Real size of the printed marker')
-    parser.add_argument('--ros_ip', type=str, default='localhost', required=False, help='IP address of the ROS network')
+    parser.add_argument('--url', default='http://192.168.1.100', type=str, required=False, help='url of the camera stream')
+    parser.add_argument('--calibration_file', default='calibration_1280x720.yml', type=str, required=False, help='YML file to load calibration matrices')
+    parser.add_argument('--marker_size', default=43.2, type=float, required=False, help='Real size of the printed marker')
+    parser.add_argument('--ros_ip', type=str, default='192.168.1.2', required=False, help='IP address of the ROS network')
 
     args = parser.parse_args()
 

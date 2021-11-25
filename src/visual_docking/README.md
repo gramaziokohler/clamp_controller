@@ -25,4 +25,8 @@ https://chev.me/arucogen/
 
 ## Usage
 
-    python pose_from_network.py --url tcp://192.168.1.102:5000 --calibration_file calibration_1280x720.yml --marker_size 43.2 --ros_ip 192.168.1.4
+    python pose_from_network.py --url tcp://192.168.1.102:5000 --calibration_file calibration_1280x720.yml --marker_size 43.2 --ros_ip 192.168.1.2
+
+    conda activate opencv
+    cd ..\clamp_controller\src\visual_docking\
+    python aruco_board_pose_from_network.py --url http://192.168.1.100 --calibration_file calibration_1280x720.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2

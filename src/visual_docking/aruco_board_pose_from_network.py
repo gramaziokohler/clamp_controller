@@ -21,7 +21,12 @@ class VideoCapture:
 
     def __init__(self, name):
         self.name = name
-        self.cap = cv2.VideoCapture(self.name)
+
+        print("Initiating cv2.VideoCapture")
+
+        self.cap = cv2.VideoCapture(self.name, cv2.CAP_VFW )
+        print("Finished initiating cv2.VideoCapture")
+
         self.frame_lock = threading.Lock()
         self.capture_lock = threading.Lock()
         self.tick = 0
@@ -84,15 +89,15 @@ class VideoCapture:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
-    parser.add_argument('--url', type=str, required=True, help='url of the camera stream')
-    parser.add_argument('--calibration_file', type=str, required=True, help='YML file to load calibration matrices')
+    parser.add_argument('--url', default='http://192.168.1.101', type=str, required=False, help='url of the camera stream')
+    parser.add_argument('--calibration_file', default='calibration_1280x720.yml', type=str, required=False, help='YML file to load calibration matrices')
 
     parser.add_argument('--dictionary_name', type=str, default="DICT_4X4_50", help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--markers_count_x', type=int, default=4, help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--markers_count_y', type=int, default=2, help='Name of aruco dictionary, default DICT_4X4_50')
-    parser.add_argument('--marker_size', type=float, required=True, help='Real size of the printed marker (convention is mm)')
-    parser.add_argument('--marker_spacing', type=float, required=True, help='Spacing between markers (convention is mm)')
-    parser.add_argument('--ros_ip', type=str, default='localhost', required=False, help='IP address of the ROS network')
+    parser.add_argument('--marker_size', default=10.0, type=float, help='Real size of the printed marker')
+    parser.add_argument('--marker_spacing', default=2.0, type=float, help='Spacing between markers (convention is mm)')
+    parser.add_argument('--ros_ip', type=str, default='192.168.1.2', help='IP address of the ROS network')
 
     parser.add_argument('--output_board', action='store_true',  help='If set, a png image of the ArUco Board will be saved.')
 
