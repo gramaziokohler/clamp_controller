@@ -47,7 +47,7 @@
             "program": "src/visual_docking/calibration.py",
             "console": "integratedTerminal",
             "args": [
-                "--url", "http://192.168.0.160",
+                "--url", "http://192.168.1.100",
                 "--square_size", "4.0",
                 "--width", "8",
                 "--height", "6",
