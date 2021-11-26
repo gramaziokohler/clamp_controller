@@ -34,7 +34,11 @@ class VideoCapture:
     def _reader(self):
 
         print("Initiating cv2.VideoCapture")
-        cap = cv2.VideoCapture(self.name)
+        try:
+            self.cap = cv2.VideoCapture(self.name)
+        except Exception as e :
+            print (e)
+
         print("Finished initiating cv2.VideoCapture")
 
         while True:
@@ -44,11 +48,11 @@ class VideoCapture:
             if self.terminate:
                 print("Reader thread is terminated by self.terminate flag. (Before cap.read()")
                 self.terminate = False
-                cap.release()
+                self.cap.release()
                 return
 
             self.capture_lock.acquire()
-            success, frame = cap.read()
+            success, frame = self.cap.read()
             self.capture_lock.release()
 
             print("Frame %i arrived after %.2f. Success = %s" % (self.tick+1, (time.time() - start), success))
@@ -58,7 +62,7 @@ class VideoCapture:
             if self.terminate:
                 print("Reader thread is terminated by self.terminate flag. (After cap.read()")
                 self.terminate = False
-                cap.release()
+                self.cap.release()
                 return
 
 
@@ -81,7 +85,7 @@ class VideoCapture:
     def restart(self):
         print("restart will now stop currect Video Capture")
         self.terminate = True
-        time.sleep(1)
+
         # if self.cap:
         #     self.cap.release()
         #     time.sleep(0.5)
@@ -89,7 +93,15 @@ class VideoCapture:
         #     self.reader_thread._stop()
         # except Exception:
         #     print ("self.reader_thread._stop() failed")
-        self.reader_thread.join()
+
+        self.reader_thread.join() # This worked
+        # if self.cap:
+        #     self.cap.release()
+
+        # lock = self.reader_thread._tstate_lock
+        # if lock is not None:
+        #     if lock.locked():
+        #         lock.release()
         # self.reader_thread._stop()
 
         print("restart will now start new Video Capture")
@@ -165,9 +177,11 @@ if __name__ == '__main__':
         if not success:
             unsuccessful_time = (time.time() - last_capture_time)
             if unsuccessful_time > reconnect_timeout:
-                print("No frame in %s secs. Connection probably lost. Attempt to restart connection." % (reconnect_timeout))
-                vcap.restart()
-                last_capture_time = time.time()
+                print("No frame in %s secs. Connection probably lost. Will kill process." % (reconnect_timeout))
+                import sys
+                sys.exit(-1)
+                # vcap.restart()
+                # last_capture_time = time.time()
             continue
 
         ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
