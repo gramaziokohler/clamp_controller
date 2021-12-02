@@ -128,6 +128,23 @@ Read the [RemoteClampFunctionCall.py](src\clamp_controller\RemoteClampFunctionCa
 
 
 
+Addresses
+-------------
+
+In the latest use case, 4 Clamps and 4 Screwdrivers are used, also including 4 cameras on Clamps and 1 camera on Toolcanger. The addresses are as follows:
+
+| Type       | id   | radio address | camera address |
+| ---------- | ---- | ------------- | -------------- |
+| CL3        | c1   | 1             | 192.168.1.101  |
+| CL3        | c2   | 2             | 192.168.1.102  |
+| CL3M       | c3   | 3             | 192.168.1.103  |
+| CL3M       | c4   | 4             | 192.168.1.104  |
+| SL1        | s1   | 5             |                |
+| SL1        | s2   | 6             |                |
+| SL1        | s3   | 7             |                |
+| SL1_G200   | s4   | 8             |                |
+| TC4_Camera |      |               | 192.168.1.100  |
+
 Credits
 -------------
 
