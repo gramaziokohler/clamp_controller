@@ -7,7 +7,7 @@ class ScrewdriverModel(object):
 
     def __init__(
         self,
-        processName: str = 'c1',
+        process_tool_id: str = 'c1',
         typeName: str = 'CLX',
         receiver_address: str = 'b',
         StepPerMM: float = 200.0,
@@ -22,7 +22,7 @@ class ScrewdriverModel(object):
         assert type(receiver_address) == str
         assert len(receiver_address) == 1
         self._receiver_address = receiver_address
-        self.processName = processName
+        self.process_tool_id = process_tool_id
         self.typeName = typeName
 
         # High level mointoring configurations for the clamp (# Settings of the controller)

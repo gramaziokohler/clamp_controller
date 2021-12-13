@@ -122,8 +122,8 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     # Create the fields
     create_label_pair("addr", "addr")
     ui_handles["addr"].set(clamp.receiver_address)
-    create_label_pair("id", "id")
-    ui_handles["id"].set(clamp.processName)
+    create_label_pair("tool_id", "tool_id")
+    ui_handles["id"].set(clamp.process_tool_id)
     create_label_pair("type", "type")
     ui_handles["type"].set(clamp.typeName)
     create_label_pair("home", "home")

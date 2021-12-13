@@ -18,7 +18,7 @@ def current_milli_time(): return int(round(time.time() * 1000))
 class SerialCommander(object):
 
     def __init__(self):
-        self.clamps: Dict[str, ClampModel] = {}
+        self.clamps: Dict[str, ClampModel] = {} # Key of the dictionary is the Receiver Address, typical in range of (str)"1" to (str)"7"
         self.serial_port = None
         self.status_update_interval_high_ms: int = 150  # ms
         self.status_update_interval_low_ms: int = 2000  # ms
@@ -102,6 +102,12 @@ class SerialCommander(object):
         #clamp.last_comm_rssi = None
         clamp.last_comm_latency = 0
         self.clamps[clamp.receiver_address] = clamp
+
+    def get_clamp_by_process_tool_id(self, process_tool_id:str):
+        for clamp in self.clamps.values():
+            if clamp.process_tool_id == process_tool_id:
+                return clamp
+        raise ValueError("get_clamp_by_process_tool_id() failed, process_tool_id %s not found." % process_tool_id)
 
     def check_status_update_freq(self):
         """ Start or stop high frequency updates.

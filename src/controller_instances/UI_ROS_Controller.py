@@ -182,8 +182,8 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 # This will be set back to true by the sync watcher
                 commander.last_command_success = False
 
-                # Replace the clamp_id with the retrived ClampModel
-                clamp_pos_velo_list = [(commander.clamps[clamp_id], position, velocity) for clamp_id, position, velocity in instructions]
+                # Replace the process_tool_id with the retrived ClampModel
+                clamp_pos_velo_list = [(commander.get_clamp_by_process_tool_id(tool_id), position, velocity) for tool_id, position, velocity in instructions]
 
                 # Instruct commander to send command
                 success = commander.sync_clamps_move(clamp_pos_velo_list)
