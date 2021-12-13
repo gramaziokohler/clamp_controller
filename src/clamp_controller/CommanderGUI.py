@@ -14,19 +14,23 @@ logger_ui = logging.getLogger("app.UI")
 
 
 class BackgroundCommand(Enum):
-    SERIAL_CONNECT = 1  # Rename these to UI_*
-    CMD_CLAMP_GOTO = 2
-    CMD_STOP = 3
-    CMD_HOME = 4
-    CMD_CLAMP_VELO = 5
-    LOGGING = 6
-    UI_ROS_CONNECT = 7
-    ROS_VEL_GOTO_COMMAND = 8
-    ROS_STOP_COMMAND = 9
+    # Misc UI Control
+    UI_SERIAL_CONNECT = 1
+    UI_ROS_CONNECT = 2
+    LOGGING = 3
+    # Manually issued movement command
     CMD_POWER = 10
-    CMD_SCREWDRIVER_GOTO = 11
-    CMD_SCREWDRIVER_VELO = 12
-    CMD_SCREWDRIVER_GRIPPER = 13
+    CMD_HOME = 11
+    CMD_STOP = 12
+    CMD_CLAMP_GOTO = 13
+    CMD_CLAMP_VELO = 14
+    CMD_SCREWDRIVER_GOTO = 15
+    CMD_SCREWDRIVER_VELO = 16
+    CMD_SCREWDRIVER_GRIPPER = 17
+    # Commands coming from ROS
+    ROS_VEL_GOTO_COMMAND = 20
+    ROS_STOP_COMMAND = 21
+    ROS_SCREWDRIVER_GRIPPER_COMMAND = 22
 
 
 def create_commander_gui(root, q: Queue, clamps):
@@ -80,7 +84,7 @@ def create_ui_connect(root, q: Queue):
         for port in ports:
             if (cb_value == port.__str__()):
                 logger_ui.info("Selected Port: %s" % port[0])
-                q.put(SimpleNamespace(type=BackgroundCommand.SERIAL_CONNECT, port=port[0]))
+                q.put(SimpleNamespace(type=BackgroundCommand.UI_SERIAL_CONNECT, port=port[0]))
                 break
     button = tk.Button(frame, text="Connect / Reconnect", command=on_connect_button_click)
     button.pack(side=tk.LEFT)
@@ -243,7 +247,7 @@ def create_ui_control(root, q: Queue):
     tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
 
-    def on_gripper_button_click(extend:bool):
+    def on_gripper_button_click(extend: bool):
         if extend:
             logger_ui.info("Button Pressed: Gripper Extend")
         else:
@@ -253,7 +257,6 @@ def create_ui_control(root, q: Queue):
     tk.Label(frame, text="Pin Gripper", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     tk.Button(frame, text="Extend / Grip", command=lambda: on_gripper_button_click(True)).pack(side=tk.LEFT)
     tk.Button(frame, text="Retract / Release", command=lambda: on_gripper_button_click(False)).pack(side=tk.LEFT)
-
 
     # * Row for Power Setting
     # * ---------------------

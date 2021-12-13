@@ -62,8 +62,8 @@ def handle_background_commands(guiref, commander: SerialCommanderTokyo, q):
         msg = None
         msg = q.get(timeout=0.1)
         if hasattr(msg, 'type'):
-            # Handelling SERIAL_CONNECT
-            if msg.type == BackgroundCommand.SERIAL_CONNECT:
+            # Handelling UI_SERIAL_CONNECT
+            if msg.type == BackgroundCommand.UI_SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
 

@@ -69,8 +69,8 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
         msg = None
         msg = q.get(timeout=0.1)
         if hasattr(msg, 'type'):
-            # * Handelling SERIAL_CONNECT
-            if msg.type == BackgroundCommand.SERIAL_CONNECT:
+            # * Handelling UI_SERIAL_CONNECT
+            if msg.type == BackgroundCommand.UI_SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
 
@@ -249,16 +249,50 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                     positions = [position for clamp_id, position, velocity in instructions]
                     logger_ctr.warning("ROS Command Fail: send_clamp_to_jaw_position(%s,%s) Fail" % (clamps, positions))
 
-            # Handelling ROS_STOP_COMMAND
+            # * Handelling ROS_STOP_COMMAND
             if msg.type == BackgroundCommand.ROS_STOP_COMMAND:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
                 # Get the clamp objects from commander
-                clamps_to_communicate = [commander.clamps[clamp_id] for clamp_id in msg.clamps_id]
+                clamps_to_communicate = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in msg.tool_id]
                 # Instruct commander to send command
                 result = commander.stop_clamps(clamps_to_communicate)
                 logger_ctr.info("ROS_STOP_COMMAND Executed: Stop command to %s, result = %s" % (clamps_to_communicate, result))
+                if all(result):
+                    commander.ros_client.reply_ack_result(msg.sequence_id, True)
+
+            # * Handelling ROS_SCREWDRIVER_GRIPPER_COMMAND
+            if msg.type == BackgroundCommand.ROS_SCREWDRIVER_GRIPPER_COMMAND:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+
+                # Get the clamp objects from commander
+                devices_to_communicate = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in msg.tool_id]
+                if len(devices_to_communicate) == 0:
+                    logger_ctr.warning("ROS_SCREWDRIVER_GRIPPER_COMMAND has no instructions")
+                    return True
+                if not all([device.__class__ == ScrewdriverModel for device in devices_to_communicate]):
+                    logger_ctr.warning("ROS_SCREWDRIVER_GRIPPER_COMMAND has a device that is not screwdriver: %s" % devices_to_communicate)
+                    return True
+                extend = msg.extend
+
+                # Keep track if the command is completed successful.
+                # This will be set back to true by the sync watcher
+                commander.last_command_success = False
+
+                # Instruct commander to send command
+                successes = commander.set_screwdriver_gripper(devices_to_communicate, extend)
+
+                if all(successes):
+                    # Log
+                    logger_ctr.info("ROS_SCREWDRIVER_GRIPPER_COMMAND Command Executed: devices = %s, extend = %s" % (clamps, extend))
+                    # Send ACK back to ROS (No reply on Failed Send)
+                    commander.ros_client.reply_ack_result(msg.sequence_id, True)
+                else:
+                    # Log
+                    logger_ctr.warning("ROS_SCREWDRIVER_GRIPPER_COMMAND Command Fail: devices = %s, extend = %s" % (clamps, extend))
 
             # Return True if q.get() didn't return empty
             return True
