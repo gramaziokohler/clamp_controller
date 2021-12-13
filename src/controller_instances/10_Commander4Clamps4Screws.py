@@ -53,10 +53,10 @@ class SerialCommanderEightTools(SerialCommander):
         self.add_clamp(ClampModel('c2', 'CL3', '2', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c3', 'CL3M', '3', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c4', 'CL3M', '4', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 918, 0, 94.0, 225.0, 860.0, 1004.0, 4378))
-        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 918, 0, 94.0, 225.0, 860.0, 1004.0, 4378))
-        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 918, 0, 94.0, 225.0, 860.0, 1004.0, 4378))
-        self.add_clamp(ScrewdriverModel('s4', 'SL1', '8', 918, 0, 94.0, 225.0, 860.0, 1004.0, 4378))
+        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s4', 'SL1_G200', '8', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
 
         self.ros_client: RosClampCommandListener = None
         self.status_update_interval_low_ms = 950
@@ -65,7 +65,7 @@ class SerialCommanderEightTools(SerialCommander):
 if __name__ == "__main__":
 
     # *Initialize Logger
-    initialize_logging("TokyoCommander." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
+    initialize_logging("EightToolCommander." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
 
     # * Commander Model
     commander = SerialCommanderEightTools() # Create Model
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # * Code to create Controller Object. It returns guiref dictionary for background thread to act on
     root = tk.Tk() # Root TK Object
     root.title("Tokyo Clamps Commander")
-    root.geometry("1500x800")
+    root.geometry("1800x800")
     q = queue.Queue() # Command queue
     guiref = create_commander_gui(root, q, commander.clamps.values())
 
