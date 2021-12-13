@@ -15,16 +15,17 @@ logger_ui = logging.getLogger("app.UI")
 
 class BackgroundCommand(Enum):
     SERIAL_CONNECT = 1  # Rename these to UI_*
-    CMD_GOTO = 2
+    CMD_CLAMP_GOTO = 2
     CMD_STOP = 3
     CMD_HOME = 4
-    CMD_VELO = 5
+    CMD_CLAMP_VELO = 5
     LOGGING = 6
     UI_ROS_CONNECT = 7
     ROS_VEL_GOTO_COMMAND = 8
     ROS_STOP_COMMAND = 9
-
     CMD_POWER = 10
+    CMD_SCREWDRIVER_GOTO = 11
+    CMD_SCREWDRIVER_VELO = 12
 
 
 def create_commander_gui(root, q: Queue, clamps):
@@ -172,38 +173,38 @@ def create_ui_control(root, q: Queue):
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
     # Buttons
-    def on_goto_button_click(position):
+    def on_clamp_goto_button_click(position):
         logger_ui.info("Button Pressed: Go to Position %s" % position)
-        q.put(SimpleNamespace(type=BackgroundCommand.CMD_GOTO, position=position))
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_CLAMP_GOTO, position=position))
 
     tk.Label(frame, text="Clamp Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
-    tk.Button(frame, text="101mm", command=lambda: on_goto_button_click(101)).pack(side=tk.LEFT)
-    tk.Button(frame, text="102mm", command=lambda: on_goto_button_click(102)).pack(side=tk.LEFT)
-    tk.Button(frame, text="110mm", command=lambda: on_goto_button_click(110)).pack(side=tk.LEFT)
-    tk.Button(frame, text="140mm", command=lambda: on_goto_button_click(140)).pack(side=tk.LEFT)
-    tk.Button(frame, text="155mm", command=lambda: on_goto_button_click(155)).pack(side=tk.LEFT)
-    tk.Button(frame, text="170mm", command=lambda: on_goto_button_click(170)).pack(side=tk.LEFT)
-    tk.Button(frame, text="200mm", command=lambda: on_goto_button_click(200)).pack(side=tk.LEFT)
-    tk.Button(frame, text="220mm", command=lambda: on_goto_button_click(220)).pack(side=tk.LEFT)
+    tk.Button(frame, text="101mm", command=lambda: on_clamp_goto_button_click(101)).pack(side=tk.LEFT)
+    tk.Button(frame, text="102mm", command=lambda: on_clamp_goto_button_click(102)).pack(side=tk.LEFT)
+    tk.Button(frame, text="110mm", command=lambda: on_clamp_goto_button_click(110)).pack(side=tk.LEFT)
+    tk.Button(frame, text="140mm", command=lambda: on_clamp_goto_button_click(140)).pack(side=tk.LEFT)
+    tk.Button(frame, text="155mm", command=lambda: on_clamp_goto_button_click(155)).pack(side=tk.LEFT)
+    tk.Button(frame, text="170mm", command=lambda: on_clamp_goto_button_click(170)).pack(side=tk.LEFT)
+    tk.Button(frame, text="200mm", command=lambda: on_clamp_goto_button_click(200)).pack(side=tk.LEFT)
+    tk.Button(frame, text="220mm", command=lambda: on_clamp_goto_button_click(220)).pack(side=tk.LEFT)
 
     ui_handles['custom_pos'] = tk.StringVar(value="100.5")
     tk.Entry(frame, textvariable=ui_handles['custom_pos'], width = 10,  justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_clamp_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
 
-    def on_velo_button_click(velocity):
+    def on_clamp_velo_button_click(velocity):
         logger_ui.info("Button Pressed: Set Velocity %s" % velocity)
-        q.put(SimpleNamespace(type=BackgroundCommand.CMD_VELO, velocity=velocity))
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_CLAMP_VELO, velocity=velocity))
 
     tk.Label(frame, text="Set Velocity: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    tk.Button(frame, text="1mm/s", command=lambda: on_velo_button_click(1)).pack(side=tk.LEFT)
-    tk.Button(frame, text="2mm/s", command=lambda: on_velo_button_click(2)).pack(side=tk.LEFT)
-    tk.Button(frame, text="3mm/s", command=lambda: on_velo_button_click(3)).pack(side=tk.LEFT)
-    tk.Button(frame, text="4mm/s", command=lambda: on_velo_button_click(4)).pack(side=tk.LEFT)
-    tk.Button(frame, text="5mm/s", command=lambda: on_velo_button_click(5)).pack(side=tk.LEFT)
+    tk.Button(frame, text="1mm/s", command=lambda: on_clamp_velo_button_click(1)).pack(side=tk.LEFT)
+    tk.Button(frame, text="2mm/s", command=lambda: on_clamp_velo_button_click(2)).pack(side=tk.LEFT)
+    tk.Button(frame, text="3mm/s", command=lambda: on_clamp_velo_button_click(3)).pack(side=tk.LEFT)
+    tk.Button(frame, text="4mm/s", command=lambda: on_clamp_velo_button_click(4)).pack(side=tk.LEFT)
+    tk.Button(frame, text="5mm/s", command=lambda: on_clamp_velo_button_click(5)).pack(side=tk.LEFT)
 
     ui_handles['custom_vel'] = tk.StringVar(value="2.5")
     tk.Entry(frame, textvariable=ui_handles['custom_vel'], width = 10, justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_clamp_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
 
 
     def on_stop_button_click():

@@ -45,7 +45,7 @@ def get_checkbox_selected_clamps(guiref, commander:SerialCommanderTokyo):
     return clamps_selected
 
 def handle_ui_commands(guiref, commander:SerialCommanderTokyo, q):
-    
+
     try:
         msg = None
         msg = q.get(timeout=0.1)
@@ -54,9 +54,9 @@ def handle_ui_commands(guiref, commander:SerialCommanderTokyo, q):
             if msg.type == BackgroundCommand.SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
-                
-            # Handelling CMD_GOTO
-            if msg.type == BackgroundCommand.CMD_GOTO:
+
+            # Handelling CMD_CLAMP_GOTO
+            if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -89,8 +89,8 @@ def handle_ui_commands(guiref, commander:SerialCommanderTokyo, q):
                 results = commander.home_clamps(clamps_to_communicate)
                 logger_ctr.info("Sending home command to %s, results = %s" % (clamps_to_communicate, results))
 
-            # Handelling CMD_VELO
-            if msg.type == BackgroundCommand.CMD_VELO:
+            # Handelling CMD_CLAMP_VELO
+            if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -101,7 +101,7 @@ def handle_ui_commands(guiref, commander:SerialCommanderTokyo, q):
                 logger_ctr.info("Sending Velocity command (%s) to %s, results = %s" % (velocity, clamps_to_communicate, results))
 
 
-            # Handelling CMD_VELO
+            # Handelling CMD_CLAMP_VELO
 
 
 
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     commander = SerialCommanderTokyo()
     # Get GUI Reference
     guiref = create_commander_gui(root, q, commander.clamps.values())
-    
+
     # Start the background thread that processes UI commands
     t1 = Thread(target=background_thread, args=(guiref, commander, q))
     t1.daemon = True

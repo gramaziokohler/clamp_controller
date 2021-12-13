@@ -96,8 +96,8 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                     guiref['ros']['ros_status'].set("Not Connected")
                     pass
 
-            # Handelling CMD_GOTO
-            if msg.type == BackgroundCommand.CMD_GOTO:
+            # Handelling CMD_CLAMP_GOTO
+            if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -144,8 +144,8 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 results = commander.home_clamps(clamps_to_communicate)
                 logger_ctr.info("Sending home command to %s, results = %s" % (clamps_to_communicate, results))
 
-            # Handelling CMD_VELO
-            if msg.type == BackgroundCommand.CMD_VELO:
+            # Handelling CMD_CLAMP_VELO
+            if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True

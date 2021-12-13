@@ -89,8 +89,8 @@ def handle_background_commands(guiref, commander: SerialCommanderTokyo, q):
                     guiref['ros']['ros_status'].set("Not Connected")
                     pass
 
-            # Handelling CMD_GOTO
-            if msg.type == BackgroundCommand.CMD_GOTO:
+            # Handelling CMD_CLAMP_GOTO
+            if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -137,8 +137,8 @@ def handle_background_commands(guiref, commander: SerialCommanderTokyo, q):
                 results = commander.home_clamps(clamps_to_communicate)
                 logger_ctr.info("Sending home command to %s, results = %s" % (clamps_to_communicate, results))
 
-            # Handelling CMD_VELO
-            if msg.type == BackgroundCommand.CMD_VELO:
+            # Handelling CMD_CLAMP_VELO
+            if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -162,7 +162,7 @@ def handle_background_commands(guiref, commander: SerialCommanderTokyo, q):
 
                 # Replace the clamp_id with the retrived ClampModel
                 clamp_pos_velo_list = [(commander.clamps[clamp_id], position, velocity) for clamp_id, position, velocity in instructions]
-                
+
                 # Instruct commander to send command
                 success = commander.sync_clamps_move(clamp_pos_velo_list)
 
@@ -225,7 +225,7 @@ def update_status(guiref, commander: SerialCommanderTokyo):
             if clamp.currentJawPosition is not None:
                 guiref['status'][clamp.receiver_address]['position'].set("%04.1fmm" % clamp.currentJawPosition)
             # Step Error with orange Label > abs(100 steps)
-            if clamp._raw_currentPosition is not None:    
+            if clamp._raw_currentPosition is not None:
                 guiref['status'][clamp.receiver_address]['error'].set("%3i steps" % int(clamp._raw_currentPosition - clamp._raw_currentTarget))
                 guiref['status'][clamp.receiver_address]['power_label'].config(fg = "orange" if abs(clamp._raw_currentPosition - clamp._raw_currentTarget) > 100 else "black")
             # Motor Power percentage with Orange Label > 90%
@@ -238,7 +238,7 @@ def update_status(guiref, commander: SerialCommanderTokyo):
                 guiref['status'][clamp.receiver_address]['battery'].set("%2i%%" % clamp.batteryPercentage)
                 guiref['status'][clamp.receiver_address]['battery_label'].config(fg = "red" if clamp.batteryPercentage < 10 else "black")
 
-            # Clamp Last Communicate Time with Read Label > 500ms 
+            # Clamp Last Communicate Time with Read Label > 500ms
             if clamp._state_timestamp is not None:
                 guiref['status'][clamp.receiver_address]['last_com'].set("%2dms" % (current_milli_time() - clamp._state_timestamp))
                 guiref['status'][clamp.receiver_address]['last_com_label'].config(fg = "red" if (current_milli_time() - clamp._state_timestamp) > 500 else "black")
