@@ -123,7 +123,7 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     create_label_pair("addr", "addr")
     ui_handles["addr"].set(clamp.receiver_address)
     create_label_pair("tool_id", "tool_id")
-    ui_handles["id"].set(clamp.process_tool_id)
+    ui_handles["tool_id"].set(clamp.process_tool_id)
     create_label_pair("type", "type")
     ui_handles["type"].set(clamp.typeName)
     create_label_pair("home", "home")
@@ -208,6 +208,7 @@ def create_ui_control(root, q: Queue):
         logger_ui.info("Button Pressed: Set Power %s" % power)
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_POWER, power=power))
 
+    # * Row for
     frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
