@@ -26,6 +26,7 @@ class BackgroundCommand(Enum):
     CMD_POWER = 10
     CMD_SCREWDRIVER_GOTO = 11
     CMD_SCREWDRIVER_VELO = 12
+    CMD_SCREWDRIVER_GRIPPER = 13
 
 
 def create_commander_gui(root, q: Queue, clamps):
@@ -241,6 +242,18 @@ def create_ui_control(root, q: Queue):
     ui_handles['custom_vel'] = tk.StringVar(value="0.80")
     tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+
+    def on_gripper_button_click(extend:bool):
+        if extend:
+            logger_ui.info("Button Pressed: Gripper Extend")
+        else:
+            logger_ui.info("Button Pressed: Gripper Retract")
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_SCREWDRIVER_GRIPPER, extend=extend))
+
+    tk.Label(frame, text="Pin Gripper", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    tk.Button(frame, text="Extend / Grip", command=lambda: on_gripper_button_click(True)).pack(side=tk.LEFT)
+    tk.Button(frame, text="Retract / Release", command=lambda: on_gripper_button_click(False)).pack(side=tk.LEFT)
+
 
     # * Row for Power Setting
     # * ---------------------

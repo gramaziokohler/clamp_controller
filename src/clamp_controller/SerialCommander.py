@@ -7,6 +7,7 @@ import serial.tools.list_ports
 from serial import Serial
 
 from clamp_controller.ClampModel import ClampModel
+from clamp_controller.ScrewdriverModel import ScrewdriverModel
 from serial_radio_transport_driver.Message import Message
 from serial_radio_transport_driver.ReliableMessenger import ReliableMessenger
 from serial_radio_transport_driver.SerialTransport import SerialRadioTransport
@@ -18,7 +19,7 @@ def current_milli_time(): return int(round(time.time() * 1000))
 class SerialCommander(object):
 
     def __init__(self):
-        self.clamps: Dict[str, ClampModel] = {} # Key of the dictionary is the Receiver Address, typical in range of (str)"1" to (str)"7"
+        self.clamps: Dict[str, ClampModel] = {}  # Key of the dictionary is the Receiver Address, typical in range of (str)"1" to (str)"7"
         self.serial_port = None
         self.status_update_interval_high_ms: int = 150  # ms
         self.status_update_interval_low_ms: int = 2000  # ms
@@ -103,7 +104,7 @@ class SerialCommander(object):
         clamp.last_comm_latency = 0
         self.clamps[clamp.receiver_address] = clamp
 
-    def get_clamp_by_process_tool_id(self, process_tool_id:str):
+    def get_clamp_by_process_tool_id(self, process_tool_id: str):
         for clamp in self.clamps.values():
             if clamp.process_tool_id == process_tool_id:
                 return clamp
@@ -349,6 +350,18 @@ class SerialCommander(object):
         for clamp in clamps:
             success = self.set_clamp_velocity(clamp, velocity_mm_sec, retry=retry)
             successes.append(success)
+        return successes
+
+    def set_screwdriver_gripper(self, devices: List[ScrewdriverModel], extend: bool, retry: int = 3) -> List[bool]:
+        """Stop multiple clamps
+        """
+        successes = []
+        for device in devices:
+            if extend:
+                response = self.message_clamp(device, "i1", retry=retry)
+            else:
+                response = self.message_clamp(device, "i0", retry=retry)
+            successes.append(response is not None)
         return successes
 
     def set_clamp_power(self, clamp: ClampModel, power_pct: float) -> bool:

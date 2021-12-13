@@ -17,6 +17,7 @@ from clamp_controller.RosClampCommandListener import RosClampCommandListener
 
 from UI_ROS_Controller import initialize_logging, background_thread
 
+
 def current_milli_time(): return int(round(time.time() * 1000))
 
 # This UI implemented a Model-View-Controller pattern.
@@ -33,6 +34,7 @@ def current_milli_time(): return int(round(time.time() * 1000))
 last_status_update_time = 0
 
 # * Model Object
+
 
 class SerialCommanderEightTools(SerialCommander):
 
@@ -68,13 +70,13 @@ if __name__ == "__main__":
     initialize_logging("EightToolCommander." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
 
     # * Commander Model
-    commander = SerialCommanderEightTools() # Create Model
+    commander = SerialCommanderEightTools()  # Create Model
 
     # * Code to create Controller Object. It returns guiref dictionary for background thread to act on
-    root = tk.Tk() # Root TK Object
+    root = tk.Tk()  # Root TK Object
     root.title("Tokyo Clamps Commander")
     root.geometry("1800x800")
-    q = queue.Queue() # Command queue
+    q = queue.Queue()  # Command queue
     guiref = create_commander_gui(root, q, commander.clamps.values())
 
     # Start the background thread that processes UI commands

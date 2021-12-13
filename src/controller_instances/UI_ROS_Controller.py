@@ -190,6 +190,21 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 results = commander.set_clamps_velocity(clamps_to_communicate, velocity)
                 logger_ctr.info("Sending Velocity command (%s) to Screwdrivers %s, results = %s" % (velocity, clamps_to_communicate, results))
 
+            # * Handelling CMD_SCREWDRIVER_GRIPPER
+            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_GRIPPER:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+                # Instruct commander to send command
+                extend = msg.extend
+                devices_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                devices_to_communicate = [clamp for clamp in devices_to_communicate if clamp.__class__ == ScrewdriverModel]
+                results = commander.set_screwdriver_gripper(devices_to_communicate, extend)
+                if extend:
+                    logger_ctr.info("Pin Gripper Extend sent to Screwdrivers %s, results = %s" % (devices_to_communicate, results))
+                else:
+                    logger_ctr.info("Pin Gripper Retract sent to Screwdrivers %s, results = %s" % (devices_to_communicate, results))
+
             # * Handelling CMD_POWER
             if msg.type == BackgroundCommand.CMD_POWER:
                 if not commander.is_connected:
