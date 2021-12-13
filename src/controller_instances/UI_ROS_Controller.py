@@ -280,16 +280,17 @@ def update_status(guiref, commander: SerialCommander):
 
             # * Update Screwdriver specific values
             if isinstance(clamp, ScrewdriverModel):
-                guiref['status'][clamp.receiver_address]['grip'].set("%3.1f / %3.1f mm" % clamp.currentGripperPosition)
+                if clamp.currentGripperPosition != (None, None):
+                    guiref['status'][clamp.receiver_address]['grip'].set("%3.1f / %3.1f mm" % clamp.currentGripperPosition)
 
                 if clamp._raw_gripper_status is not None:
                     guiref['status'][clamp.receiver_address]['g_status'].set(g_status_dict[clamp._raw_gripper_status])
                     if clamp._raw_gripper_status in [1, 2]:
-                        guiref['status'][clamp.receiver_address]['g_status'].config(fg="green")
+                        guiref['status'][clamp.receiver_address]['g_status_label'].config(fg="green")
                     elif clamp._raw_gripper_status in [5, 6]:
-                        guiref['status'][clamp.receiver_address]['g_status'].config(fg="red")
+                        guiref['status'][clamp.receiver_address]['g_status_label'].config(fg="red")
                     else:
-                        guiref['status'][clamp.receiver_address]['g_status'].config(fg="black")
+                        guiref['status'][clamp.receiver_address]['g_status_label'].config(fg="black")
 
         return True
     else:
