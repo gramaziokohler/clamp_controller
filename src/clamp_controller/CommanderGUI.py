@@ -30,6 +30,8 @@ class BackgroundCommand(Enum):
 def create_commander_gui(root, q: Queue, clamps):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)
     tk.font_value = tkFont.Font(family="Lucida Console", size=20)
+    tk.font_title = tkFont.Font(family="Lucida Grande", size=12)
+    tk.font_description = tkFont.Font(family="Lucida Grande", size=8)
 
     ui_handles = {}
     ui_handles['connect'] = create_ui_connect(root, q)
@@ -42,9 +44,14 @@ def create_commander_gui(root, q: Queue, clamps):
 
 def create_ui_connect(root, q: Queue):
     ui_handles = {}
+
+    # * Title frame
+    frame = ttk.Frame(root, borderwidth=0)
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="Connection ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text=" (Serial Port for Radio Dongle)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
+
     # Title and frame
-    title = tk.Label(root, text="Connection")
-    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
@@ -82,13 +89,17 @@ def create_ui_connect(root, q: Queue):
 def create_ui_status(root, q: Queue, clamps):
     ui_handles = {}
 
-    # Title and frame
-    title = tk.Label(root, text="Status")
-    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
+    # * Title frame
+    frame = ttk.Frame(root, borderwidth=0)
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="Status ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text=" (Checked devices are regularly polled)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
+
+
+    # * Create one row of status per clamp
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    # Create one row of status per clamp
     for clamp in clamps:
         ui_handles[clamp.receiver_address] = create_one_ui_status(frame, q, clamp)
 
@@ -146,9 +157,14 @@ def create_ui_control(root, q: Queue):
 
     ui_handles = {}
 
-    # Title and frame
-    title = tk.Label(root, text="Control")
-    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
+    # * Title frame
+    frame = ttk.Frame(root, borderwidth=0)
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="Device Control ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text=" (Manual Commands are only sent to Checked)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
+
+    # * Row for Clamp Control
+    # * ---------------------
     frame_outside = ttk.Frame(root, borderwidth=2, relief='solid')
     frame_outside.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
@@ -160,7 +176,7 @@ def create_ui_control(root, q: Queue):
         logger_ui.info("Button Pressed: Go to Position %s" % position)
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_GOTO, position=position))
 
-    tk.Label(frame, text="Go to Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text="Clamp Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
     tk.Button(frame, text="101mm", command=lambda: on_goto_button_click(101)).pack(side=tk.LEFT)
     tk.Button(frame, text="102mm", command=lambda: on_goto_button_click(102)).pack(side=tk.LEFT)
     tk.Button(frame, text="110mm", command=lambda: on_goto_button_click(110)).pack(side=tk.LEFT)
@@ -197,6 +213,9 @@ def create_ui_control(root, q: Queue):
     tk.Label(frame, text="Stop: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
     tk.Button(frame, text="Stop Now", command=on_stop_button_click).pack(side=tk.LEFT)
 
+    # * Row for Power Setting
+    # * ---------------------
+
     def on_home_button_click():
         logger_ui.info("Button Pressed: HOME")
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_HOME))
@@ -208,7 +227,6 @@ def create_ui_control(root, q: Queue):
         logger_ui.info("Button Pressed: Set Power %s" % power)
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_POWER, power=power))
 
-    # * Row for
     frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
@@ -250,15 +268,16 @@ def create_ui_logging(root, q: Queue):
     return ui_handles
 
 
-
-
 def create_ui_ros(root, q: Queue):
 
     ui_handles = {}
 
-    # Title and frame
-    title = tk.Label(root, text="ROS Connection")
-    title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
+    # * Title frame
+    frame = ttk.Frame(root, borderwidth=0)
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+    tk.Label(frame, text="ROS Connection ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text=" (RFL ROS:192.168.0.117, LOCAL ROS:192.168.1.2)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
+
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
