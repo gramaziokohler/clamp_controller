@@ -69,12 +69,12 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
         msg = None
         msg = q.get(timeout=0.1)
         if hasattr(msg, 'type'):
-            # Handelling SERIAL_CONNECT
+            # * Handelling SERIAL_CONNECT
             if msg.type == BackgroundCommand.SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
 
-            # Handelling UI_ROS_CONNECT
+            # * Handelling UI_ROS_CONNECT
             if msg.type == BackgroundCommand.UI_ROS_CONNECT:
                 logger_ctr.info("Command Received to Connect to ROS at %s" % msg.ip)
                 # Disconnect from previous host
@@ -96,7 +96,27 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                     guiref['ros']['ros_status'].set("Not Connected")
                     pass
 
-            # Handelling CMD_CLAMP_GOTO
+            def _send_goto_command(devices, position):
+                """ Instruct commander to send a goto command
+
+                Beware this is not a syncronous command, because the clamp velocity might be different.
+                However, we still implement a stop_clamps() in case of messaging failure
+                """
+                if len(devices) == 0:
+                    logger_ctr.warning("No device is selected for the movement command.")
+                    return
+
+                successes = []
+                processed_devices = []
+                for device in devices:
+                    success = commander.send_clamp_to_jaw_position(device, position)
+                    successes.append(success)
+                    processed_devices.append(device)
+                    if not success:
+                        commander.stop_clamps(processed_devices)
+                logger_ctr.info("Movement command executed. position = %smm, devices = %s, result = %s" % (position, devices, successes))
+
+            # * Handelling CMD_CLAMP_GOTO
             if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
@@ -104,37 +124,39 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
 
                 # Check for selected clamps
                 clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
-                if len(clamps_to_communicate) == 0:
-                    logger_ctr.warning("No clamp is selected for the movement command.")
+                clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ClampModel]
+                _send_goto_command(clamps_to_communicate, msg.position)
+                return True
+
+            # * Handelling CMD_SCREWDRIVER_GOTO
+            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_GOTO:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
                     return True
 
-                # Instruct commander to send command
-                position = msg.position
-                # Beware this is not a syncronous command, because the clamp velocity might be different.
-                # However, we still implement a stop_clamps() in case of messaging failure
-                successes = []
-                processed_clamps = []
-                for clamp in clamps_to_communicate:
-                    success = commander.send_clamp_to_jaw_position(clamp, position)
-                    successes.append(success)
-                    processed_clamps.append(clamp)
-                    if not success:
-                        commander.stop_clamps(processed_clamps)
-                logger_ctr.info("Movement command executed. position = %smm, clamps = %s, result = %s" % (position, clamps_to_communicate, successes))
+                # Check for selected clamps
+                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ScrewdriverModel]
+                _send_goto_command(clamps_to_communicate, msg.position)
+                return True
 
-            # Handelling CMD_STOP
+            # * Handelling CMD_STOP
             if msg.type == BackgroundCommand.CMD_STOP:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
                 # Instruct commander to send command
-                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
-                if len(clamps_to_communicate) == 0:
-                    return True
+                all_clamps = commander.clamps.values()
+                selected_clamps = get_checkbox_selected_clamps(guiref, commander)
+                clamps_to_communicate = [clamp for clamp in all_clamps if clamp in selected_clamps]
                 result = commander.stop_clamps(clamps_to_communicate)
-                logger_ctr.info("Sending stop command to %s, result = %s" % (clamps_to_communicate, result))
+                logger_ctr.info("Stop command sent to Selected Devices %s, result = %s" % (clamps_to_communicate, result))
+                clamps_to_communicate = [clamp for clamp in all_clamps if clamp not in selected_clamps]
+                result = commander.stop_clamps(clamps_to_communicate)
+                logger_ctr.info("Stop command sent to UnSelected Devices %s, result = %s" % (clamps_to_communicate, result))
+                return True
 
-            # Handelling CMD_HOME
+            # * Handelling CMD_HOME (Generic for both Screwdriver and Clamps)
             if msg.type == BackgroundCommand.CMD_HOME:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
@@ -142,9 +164,9 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 # Instruct commander to send command
                 clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
                 results = commander.home_clamps(clamps_to_communicate)
-                logger_ctr.info("Sending home command to %s, results = %s" % (clamps_to_communicate, results))
+                logger_ctr.info("Home command sent to %s, results = %s" % (clamps_to_communicate, results))
 
-            # Handelling CMD_CLAMP_VELO
+            # * Handelling CMD_CLAMP_VELO
             if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
@@ -152,10 +174,23 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 # Instruct commander to send command
                 velocity = msg.velocity
                 clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ClampModel]
+                logger_ctr.info("Sending Velocity command (%s) to Clamps %s, results = %s" % (velocity, clamps_to_communicate, results))
                 results = commander.set_clamps_velocity(clamps_to_communicate, velocity)
-                logger_ctr.info("Sending Velocity command (%s) to %s, results = %s" % (velocity, clamps_to_communicate, results))
 
-            # Handelling CMD_POWER
+            # * Handelling CMD_SCREWDRIVER_VELO
+            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_VELO:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+                # Instruct commander to send command
+                velocity = msg.velocity
+                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ScrewdriverModel]
+                results = commander.set_clamps_velocity(clamps_to_communicate, velocity)
+                logger_ctr.info("Sending Velocity command (%s) to Screwdrivers %s, results = %s" % (velocity, clamps_to_communicate, results))
+
+            # * Handelling CMD_POWER
             if msg.type == BackgroundCommand.CMD_POWER:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
@@ -166,7 +201,7 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 results = commander.set_clamps_power(clamps_to_communicate, power)
                 logger_ctr.info("Sending Power command (%s) to %s, results = %s" % (power, clamps_to_communicate, results))
 
-            # Handelling ROS_VEL_GOTO_COMMAND
+            # * Handelling ROS_VEL_GOTO_COMMAND
             if msg.type == BackgroundCommand.ROS_VEL_GOTO_COMMAND:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
@@ -232,7 +267,7 @@ def update_status(guiref, commander: SerialCommander):
             updated_clamps = commander.update_active_clamps_status(1)
         else:
             # * Update only clamps that are marked checked in the UI
-            checked_clamps =  get_checkbox_selected_clamps(guiref, commander)
+            checked_clamps = get_checkbox_selected_clamps(guiref, commander)
             updated_clamps = commander.update_clamps_status(checked_clamps, 1)
 
         # * Set UI values (non updated clamps are also updated because last-update time is updated)

@@ -96,7 +96,6 @@ def create_ui_status(root, q: Queue, clamps):
     tk.Label(frame, text="Status ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
     tk.Label(frame, text=" (Checked devices are regularly polled)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
 
-
     # * Create one row of status per clamp
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
@@ -121,7 +120,7 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     ui_handles['checkbox'] = tk.BooleanVar(value=True)
     tk.Checkbutton(frame, variable=ui_handles['checkbox']).pack(side=tk.LEFT, padx=10)
 
-    def create_label_pair(label_text, textvariable_name, label_name = None):
+    def create_label_pair(label_text, textvariable_name, label_name=None):
         tk.Label(frame, text=label_text, font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
         ui_handles[textvariable_name] = tk.StringVar()
         ui_handles[textvariable_name].set("<?>")
@@ -129,7 +128,6 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
             label_name = textvariable_name + "_label"
         ui_handles[label_name] = tk.Label(frame, textvariable=ui_handles[textvariable_name], font=tk.font_value)
         ui_handles[label_name].pack(side=tk.LEFT, fill=tk.Y, padx=5)
-
 
     # Create the fields
     create_label_pair("addr", "addr")
@@ -164,20 +162,20 @@ def create_ui_control(root, q: Queue):
     tk.Label(frame, text="Device Control ", font=tk.font_title).pack(side=tk.LEFT, fill=tk.Y)
     tk.Label(frame, text=" (Manual Commands are only sent to Checked)", font=tk.font_description).pack(side=tk.LEFT, fill=tk.Y)
 
-    # * Row for Clamp Control
-    # * ---------------------
     frame_outside = ttk.Frame(root, borderwidth=2, relief='solid')
     frame_outside.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
+    # * Row for Clamp Control
+    # * ---------------------
     frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
     # Buttons
     def on_clamp_goto_button_click(position):
-        logger_ui.info("Button Pressed: Go to Position %s" % position)
+        logger_ui.info("Button Pressed: Clamp Go to Position %s" % position)
         q.put(SimpleNamespace(type=BackgroundCommand.CMD_CLAMP_GOTO, position=position))
 
-    tk.Label(frame, text="Clamp Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text="Clamp: Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
     tk.Button(frame, text="101mm", command=lambda: on_clamp_goto_button_click(101)).pack(side=tk.LEFT)
     tk.Button(frame, text="102mm", command=lambda: on_clamp_goto_button_click(102)).pack(side=tk.LEFT)
     tk.Button(frame, text="110mm", command=lambda: on_clamp_goto_button_click(110)).pack(side=tk.LEFT)
@@ -188,7 +186,7 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="220mm", command=lambda: on_clamp_goto_button_click(220)).pack(side=tk.LEFT)
 
     ui_handles['custom_pos'] = tk.StringVar(value="100.5")
-    tk.Entry(frame, textvariable=ui_handles['custom_pos'], width = 10,  justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Entry(frame, textvariable=ui_handles['custom_pos'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_clamp_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
 
     def on_clamp_velo_button_click(velocity):
@@ -203,26 +201,49 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="5mm/s", command=lambda: on_clamp_velo_button_click(5)).pack(side=tk.LEFT)
 
     ui_handles['custom_vel'] = tk.StringVar(value="2.5")
-    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width = 10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_clamp_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
 
+    # * Row for Screwdriver Control
+    # * ---------------------
+    frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    def on_stop_button_click():
-        logger_ui.info("Button Pressed: STOP")
-        q.put(SimpleNamespace(type=BackgroundCommand.CMD_STOP))
+    # Buttons
+    def on_screwdriver_goto_button_click(position):
+        logger_ui.info("Button Pressed: Screwdriver Go to Position %s" % position)
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_SCREWDRIVER_GOTO, position=position))
 
-    tk.Label(frame, text="Stop: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    tk.Button(frame, text="Stop Now", command=on_stop_button_click).pack(side=tk.LEFT)
+    tk.Label(frame, text="Screwdriver: Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Button(frame, text="0mm", command=lambda: on_screwdriver_goto_button_click(0)).pack(side=tk.LEFT)
+    tk.Button(frame, text="5mm", command=lambda: on_screwdriver_goto_button_click(5)).pack(side=tk.LEFT)
+    tk.Button(frame, text="50mm", command=lambda: on_screwdriver_goto_button_click(50)).pack(side=tk.LEFT)
+    tk.Button(frame, text="100mm", command=lambda: on_screwdriver_goto_button_click(100)).pack(side=tk.LEFT)
+    tk.Button(frame, text="150mm", command=lambda: on_screwdriver_goto_button_click(150)).pack(side=tk.LEFT)
+    tk.Button(frame, text="200mm", command=lambda: on_screwdriver_goto_button_click(200)).pack(side=tk.LEFT)
+    tk.Button(frame, text="250mm", command=lambda: on_screwdriver_goto_button_click(250)).pack(side=tk.LEFT)
+
+    ui_handles['custom_pos'] = tk.StringVar(value="10.5")
+    tk.Entry(frame, textvariable=ui_handles['custom_pos'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_screwdriver_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
+
+    def on_screwdriver_velo_button_click(velocity):
+        logger_ui.info("Button Pressed: Set Velocity %s" % velocity)
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_SCREWDRIVER_VELO, velocity=velocity))
+
+    tk.Label(frame, text="Set Velocity: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    tk.Button(frame, text="0.70mm/s", command=lambda: on_screwdriver_velo_button_click(0.70)).pack(side=tk.LEFT)
+    tk.Button(frame, text="0.75mm/s", command=lambda: on_screwdriver_velo_button_click(0.75)).pack(side=tk.LEFT)
+    tk.Button(frame, text="0.80mm/s", command=lambda: on_screwdriver_velo_button_click(0.80)).pack(side=tk.LEFT)
+    tk.Button(frame, text="0.85mm/s", command=lambda: on_screwdriver_velo_button_click(0.85)).pack(side=tk.LEFT)
+    tk.Button(frame, text="0.90mm/s", command=lambda: on_screwdriver_velo_button_click(0.90)).pack(side=tk.LEFT)
+
+    ui_handles['custom_vel'] = tk.StringVar(value="0.80")
+    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
 
     # * Row for Power Setting
     # * ---------------------
-
-    def on_home_button_click():
-        logger_ui.info("Button Pressed: HOME")
-        q.put(SimpleNamespace(type=BackgroundCommand.CMD_HOME))
-
-    tk.Label(frame, text="Home: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    tk.Button(frame, text="Home Now", command=on_home_button_click).pack(side=tk.LEFT)
 
     def on_power_button_click(power):
         logger_ui.info("Button Pressed: Set Power %s" % power)
@@ -242,6 +263,25 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="80%", command=lambda: on_power_button_click(80)).pack(side=tk.LEFT)
     tk.Button(frame, text="90%", command=lambda: on_power_button_click(90)).pack(side=tk.LEFT)
     tk.Button(frame, text="99%", command=lambda: on_power_button_click(99)).pack(side=tk.LEFT)
+
+    # * Row for Power Setting
+    # * ---------------------
+    frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
+    frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
+
+    def on_stop_button_click():
+        logger_ui.info("Button Pressed: STOP")
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_STOP))
+
+    tk.Label(frame, text="MASTER STOP: ", font=tk.font_title, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    tk.Button(frame, text="! STOP ALL !", font=tk.font_title, command=on_stop_button_click).pack(side=tk.LEFT)
+
+    def on_home_button_click():
+        logger_ui.info("Button Pressed: HOME")
+        q.put(SimpleNamespace(type=BackgroundCommand.CMD_HOME))
+
+    tk.Label(frame, text="HOME Selected: ", font=tk.font_title, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    tk.Button(frame, text="Home", font=tk.font_title, command=on_home_button_click).pack(side=tk.LEFT)
 
     return ui_handles
 
