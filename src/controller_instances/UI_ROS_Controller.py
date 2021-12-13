@@ -8,6 +8,7 @@ from functools import partial
 from threading import Thread
 from tkinter import ttk
 from types import SimpleNamespace
+from typing import Dict, List, Optional, Tuple
 
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel, g_status_dict
@@ -53,7 +54,7 @@ def background_thread(guiref, commander: SerialCommander, q):
     logging.getLogger("app.bg").info("Background Thread Stopped")
 
 
-def get_checkbox_selected_clamps(guiref, commander: SerialCommander):
+def get_checkbox_selected_clamps(guiref, commander: SerialCommander) -> List[ClampModel]:
     # Determine if the clamps are selected
     clamps_selected = []
     for clamp in commander.clamps.values():
@@ -230,7 +231,9 @@ def update_status(guiref, commander: SerialCommander):
         if commander.sync_move_inaction:
             updated_clamps = commander.update_active_clamps_status(1)
         else:
-            updated_clamps = commander.update_all_clamps_status(1)
+            # * Update only clamps that are marked checked in the UI
+            checked_clamps =  get_checkbox_selected_clamps(guiref, commander)
+            updated_clamps = commander.update_clamps_status(checked_clamps, 1)
 
         # * Set UI values (non updated clamps are also updated because last-update time is updated)
         for clamp in commander.clamps.values():
