@@ -54,6 +54,9 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     elif isinstance(movement, RoboticClampSyncLinearMovement):
         return execute_robotic_clamp_sync_linear_movement(guiref, model, movement)
 
+    elif isinstance(movement, RobotScrewdriverSyncLinearMovement):
+        return execute_robotic_clamp_sync_linear_movement(guiref, model, movement)
+
     elif isinstance(movement, RoboticFreeMovement):
         return execute_robotic_free_movement(guiref, model, movement)
 
@@ -462,9 +465,14 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         return False
 
     # Remove clamp prefix and send command
-    clamp_ids = movement.clamp_ids
+    if type(movement) == RoboticClampSyncLinearMovement:
+        clamp_ids = movement.clamp_ids
+        position = movement.jaw_positions[0]
+    elif type(movement) == RobotScrewdriverSyncLinearMovement:
+        clamp_ids = movement.screwdriver_ids
+        position = movement.screw_positions[0]
+
     velocity = model.settings[movement.speed_type]
-    position = movement.jaw_positions[0]
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
     clamp_action_finished = False
 
