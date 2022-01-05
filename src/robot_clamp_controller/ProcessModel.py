@@ -133,9 +133,9 @@ class RobotClampExecutionModel(object):
         # mark_movements_as_soft_move
         _mark_movements_as_softmove(self.process)
         # some moves do not need operator stop anymore
-        _mark_movements_operator_stop(self.process)
+        # _mark_movements_operator_stop(self.process)
         # Insert operator offsets
-        _insert_offset_movements(self.process)
+        # _insert_offset_movements(self.process)
 
         # Organize movements into an OrderedDict collection for UI manupulation
         self.movements = OrderedDict()  # type : OrderedDict(Movement)
