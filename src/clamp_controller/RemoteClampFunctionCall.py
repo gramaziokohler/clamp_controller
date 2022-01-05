@@ -125,6 +125,15 @@ class RemoteClampFunctionCall(Ros):
         return False
 
     # Returns the sequence_id of sent message
+    def send_ROS_GRIPPER_OPEN_COMMAND(self, screwdriver_id):
+        """send_ROS_VEL_GOTO_COMMAND(self, screwdriver_id: str) -> int:"""
+        return self.send_ros_command("ROS_GRIPPER_OPEN_COMMAND",screwdriver_id)
+
+    def send_ROS_GRIPPER_CLOSE_COMMAND(self, screwdriver_id):
+        """send_ROS_VEL_GOTO_COMMAND(self, screwdriver_id: str) -> int:"""
+        return self.send_ros_command("ROS_GRIPPER_CLOSE_COMMAND",screwdriver_id)
+
+    # Returns the sequence_id of sent message
     def send_ROS_VEL_GOTO_COMMAND(self, clamps_id, position, velocity):
         """send_ROS_VEL_GOTO_COMMAND(self, clamps_id: str, position: float, velocity: float) -> int:"""
         instructions = []
