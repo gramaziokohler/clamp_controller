@@ -9,6 +9,7 @@ from compas.geometry.primitives.point import Point
 from compas.geometry.primitives.vector import Vector
 from compas_fab.robots import to_degrees
 from compas_fab.robots.configuration import Configuration
+from compas_fab.backends.ros.messages import ROSmsg
 from integral_timber_joints.process.action import *
 
 from robot_clamp_controller.BackgroundCommand import *
@@ -848,7 +849,7 @@ def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement:
 # rrc Helper Functions
 #########################
 
-def send_and_wait_unless_cancel(model: RobotClampExecutionModel, instruction: rrc.ROSmsg) -> rrc.FutureResult:
+def send_and_wait_unless_cancel(model: RobotClampExecutionModel, instruction: ROSmsg) -> rrc.FutureResult:
     """Send instruction and wait for feedback.
 
     This is a blocking call, it will return if the ABBClient
