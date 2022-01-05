@@ -74,6 +74,9 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
         else:
             return execute_robotic_digital_output(guiref, model, movement)
 
+    elif isinstance(movement, OperatorAttachToolMovement):
+        return execute_operator_attach_tool_movement(guiref, model, movement)
+
     elif isinstance(movement, OperatorAddJogOffset):
         return execute_operator_add_jog_offset_movement(guiref, model, movement)
 
@@ -233,7 +236,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
     if movement.digital_output == DigitalOutput.OpenGripper:
         sequence_id = model.ros_clamps.send_ROS_GRIPPER_OPEN_COMMAND(movement.tool_id)
         logger_exe.info("Sending send_ROS_GRIPPER_OPEN_COMMAND Movement (%s)"% (movement.movement_id))
-    elif movement.digital_output == DigitalOutput.OpenGripper:
+    elif movement.digital_output == DigitalOutput.CloseGripper:
         sequence_id = model.ros_clamps.send_ROS_GRIPPER_CLOSE_COMMAND(movement.tool_id)
         logger_exe.info("Sending send_ROS_GRIPPER_CLOSE_COMMAND Movement (%s)"% (movement.movement_id))
     else:
@@ -274,6 +277,12 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
                 "Screwdriver Gripper Movement (%s) stopped before completion." % movement.movement_id)
             model.ros_clamps.send_ROS_STOP_COMMAND(movement.tool_id)
             return False
+
+
+def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
+    robotic_digital_output_movement = RoboticDigitalOutput(DigitalOutput.CloseGripper, movement.tool_id, tag=movement.tag)
+    robotic_digital_output_movement.movement_id = movement.movement_id
+    return execute_robotic_digital_output_screwdriver(guiref, model, robotic_digital_output_movement)
 
 
 def execute_jog_robot_to_state(guiref, model, robot_state: Configuration, message: str, q):
