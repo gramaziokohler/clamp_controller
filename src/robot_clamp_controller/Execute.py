@@ -340,7 +340,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
-    # Check soft move state and send softmove command is state is different.
+    # Check softmove state and send softmove command if state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     if get_softness_enable(guiref):
         if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
@@ -445,7 +445,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
-    # Check soft move state and send softmove command is state is different.
+    # Check softmove state and send softmove command if state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     if get_softness_enable(guiref):
         if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
@@ -462,7 +462,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         return False
 
     # Remove clamp prefix and send command
-    clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
+    clamp_ids = movement.clamp_ids
     velocity = model.settings[movement.speed_type]
     position = movement.jaw_positions[0]
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
@@ -551,7 +551,7 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         return False
 
     # Remove clamp prefix:
-    clamp_ids = [clamp_id[1:] for clamp_id in movement.clamp_ids]
+    clamp_ids = movement.clamp_ids
     velocity = model.settings[movement.speed_type]
     position = movement.jaw_positions[0]
     model.ros_clamps.last_command_success = None
