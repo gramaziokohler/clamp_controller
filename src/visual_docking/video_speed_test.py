@@ -21,5 +21,10 @@ while True:
     if key & 0xFF == ord('q'):
         break
 
+    if key & 0xFF == ord('r'):
+        cap.release()
+        cap = cv2.VideoCapture('http://192.168.1.100')
+        ret, frame = cap.read()
+
 cap.release()
 print ("after release")

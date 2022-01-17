@@ -24,6 +24,7 @@ class VideoCapture:
         self.frame_lock = threading.Lock()
         self.capture_lock = threading.Lock()
         self.tick = 0
+        self.last_restart_tick = 0
         self.buffer = None
         self.terminate = False
         self.reader_thread = threading.Thread(target=self._reader)
@@ -82,48 +83,36 @@ class VideoCapture:
         self.frame_lock.release()
         return True, frame
 
-    def restart(self):
+    def restart(self, sleep = 0.2):
         print("restart will now stop currect Video Capture")
         self.terminate = True
-
-        # if self.cap:
-        #     self.cap.release()
-        #     time.sleep(0.5)
-        # try:
-        #     self.reader_thread._stop()
-        # except Exception:
-        #     print ("self.reader_thread._stop() failed")
-
-        self.reader_thread.join() # This worked
-        # if self.cap:
-        #     self.cap.release()
-
-        # lock = self.reader_thread._tstate_lock
-        # if lock is not None:
-        #     if lock.locked():
-        #         lock.release()
-        # self.reader_thread._stop()
+        self.reader_thread.join() # Wait for capture thread to finish gracefully
+        time.sleep(sleep) # Solved the problem of occational problem of fail to restart.
 
         print("restart will now start new Video Capture")
         self.terminate = False
         self.reader_thread = threading.Thread(target=self._reader)
         self.reader_thread.daemon = True
         self.reader_thread.start()
+        # Wait for some frames to arrive after reader thread restart
+        time.sleep(sleep) # Solved the problem of occational problem of fail to restart.
+
+        self.last_restart_tick = self.tick
 
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera calibration')
     parser.add_argument('--url', default='http://192.168.1.100', type=str, required=False, help='url of the camera stream')
-    parser.add_argument('--calibration_file', default='src/visual_docking/calibrations/cam1_70mm_1600_1200.yml', type=str, required=False, help='YML file to load calibration matrices')
+    parser.add_argument('--calibration_file', default='calibrations/cam100_1600x1200.yml', type=str, required=False, help='YML file to load calibration matrices')
 
     parser.add_argument('--dictionary_name', type=str, default="DICT_4X4_50", help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--markers_count_x', type=int, default=4, help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--markers_count_y', type=int, default=2, help='Name of aruco dictionary, default DICT_4X4_50')
     parser.add_argument('--marker_size', default=10.0, type=float, help='Real size of the printed marker')
     parser.add_argument('--marker_spacing', default=2.0, type=float, help='Spacing between markers (convention is mm)')
-    parser.add_argument('--ros_ip', type=str, default='192.168.1.2', help='IP address of the ROS network')
-    parser.add_argument('--ros_topic', type=str, default='frame_cam_1', help='IP address of the ROS network')
+    parser.add_argument('--ros_ip', type=str, default='192.168.0.120', help='IP address of the ROS network')
+    parser.add_argument('--ros_topic', type=str, default='tc_frame', help='IP address of the ROS network')
 
     parser.add_argument('--output_board', action='store_true',  help='If set, a png image of the ArUco Board will be saved.')
 
@@ -156,6 +145,7 @@ if __name__ == '__main__':
     # try:
         # cv2 Video Capture does deal with the multipart jpeg stream.
     vcap = VideoCapture(args.url)
+    
     retval = 0
     last_capture_time = time.time()
     reconnect_timeout = 5.0
@@ -167,9 +157,15 @@ if __name__ == '__main__':
         if key & 0xFF == ord('q'):
             break
 
-        # * Restart Camera Mechanism
+        # * Restart Camera Manually
         if key & 0xFF == ord('r'):
-            print("Restarting Camera Stream")
+            print("Manually initiated Camera Restart")
+            vcap.restart()
+            continue
+        
+        # Restart after a certain frame count
+        if vcap.tick - vcap.last_restart_tick > 20:
+            print("Periodically initiated Camera Restart")
             vcap.restart()
             continue
 
@@ -177,11 +173,16 @@ if __name__ == '__main__':
         if not success:
             unsuccessful_time = (time.time() - last_capture_time)
             if unsuccessful_time > reconnect_timeout:
-                print("No frame in %s secs. Connection probably lost. Will kill process." % (reconnect_timeout))
-                import sys
-                sys.exit(-1)
-                # vcap.restart()
-                # last_capture_time = time.time()
+                print("No frame in %s secs. Connection probably lost. Will attempt to restart capture stream." % ((time.time() - last_capture_time)))
+                vcap.restart(2)
+                time.sleep(1) # Wait for some time after thread restart
+                # last_capture_time = time.time() #Pretend this is successful and give it more time to read
+
+                # success, frame = vcap.read()  # Attempt to read one frame
+                # if not success:
+                #     print("Cannot receive frame after restart. Connection probably lost. Will kill process." )
+                #     import sys
+                #     sys.exit(-1)
             continue
 
         ids, corners, rejected_img_points = detect_markers(frame, board.dictionary)
