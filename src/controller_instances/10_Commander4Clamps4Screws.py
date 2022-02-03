@@ -15,7 +15,7 @@ from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gu
 from clamp_controller.SerialCommander import SerialCommander
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
 
-from UI_ROS_Controller import initialize_logging, background_thread
+from controller_instances.UI_ROS_Controller import initialize_logging, background_thread
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
@@ -67,7 +67,7 @@ class SerialCommanderEightTools(SerialCommander):
 if __name__ == "__main__":
 
     # *Initialize Logger
-    initialize_logging("EightToolCommander." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
+    initialize_logging("ClampController." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
 
     # * Commander Model
     commander = SerialCommanderEightTools()  # Create Model
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     t1.start()
 
     # Override default ip
-    guiref['ros']['ros_ip_entry'].set('192.168.0.117')
+    guiref['ros']['ros_ip_entry'].set('192.168.0.120')
     # hostip = '192.168.43.141'
     # try:
     #     commander.ros_client = RosCommandListener(hostip, partial(ros_command_callback, q = q))
