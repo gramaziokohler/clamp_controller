@@ -285,7 +285,7 @@ def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionMode
     return execute_robotic_digital_output_screwdriver(guiref, model, robotic_digital_output_movement)
 
 
-def execute_jog_robot_to_state(guiref, model, robot_state: Configuration, message: str, q):
+def execute_jog_robot_to_config(guiref, model, config: Configuration, message: str, q):
     """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
 
     This functions blocks and waits for the completion. For example if operator did not
@@ -299,9 +299,8 @@ def execute_jog_robot_to_state(guiref, model, robot_state: Configuration, messag
     # Construct and send rrc command
     model.run_status = RunStatus.JOGGING
     q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-    point = robot_state['robot'].kinematic_config
-    ext_values = to_millimeters(point.values[0:3])
-    joint_values = to_degrees(point.values[3:10])
+    ext_values = to_millimeters(config.prismatic_values)
+    joint_values = to_degrees(config.revolute_values)
 
     # Apply Offsets
     ext_values = apply_ext_offsets(guiref, ext_values)
@@ -313,7 +312,7 @@ def execute_jog_robot_to_state(guiref, model, robot_state: Configuration, messag
     instruction = rrc.MoveToJoints(joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE)
     future = send_and_wait_unless_cancel(model, instruction)
     if future.done:
-        logger_exe.info("execute_jog_robot_to_state complete")
+        logger_exe.info("execute_jog_robot_to_config complete")
         model.run_status = RunStatus.STOPPED
     else:
         logger_exe.warn("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
@@ -403,9 +402,9 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
             #     if movement.path_from_link is not None:
             #         target_frame = movement.path_from_link["robot11_tool0"][position_readout_point]  # type: Frame
             #         target_frame = frame_to_millimeters(target_frame)
-            #         target_ext_axes = to_millimeters(movement.trajectory.points[position_readout_point].values[0:3])
+            #         target_ext_axes = to_millimeters(movement.trajectory.points[position_readout_point].prismatic_values)
             #         actual_frame, actual_ext_axes = position_readout_futures[position_readout_point].value
-            #         actual_ext_axes = actual_ext_axes.values[0:3]
+            #         actual_ext_axes = actual_ext_axes.prismatic_values
             #         deviation_frame = target_frame.point.distance_to_point(actual_frame.point)
             #         deviation_ext_axes = Point(*target_ext_axes).distance_to_point(Point(*actual_ext_axes))
             #         logger_exe.info("Deviation for point %i: Frame Deviation = %.2fmm, ExtAxes Deviation = %.2fmm" %
@@ -473,7 +472,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
         return False
 
-    # Remove clamp prefix and send command
+    # Clean up command parameters
     if type(movement) == RoboticClampSyncLinearMovement:
         clamp_ids = movement.clamp_ids
         position = movement.jaw_positions[0]
@@ -482,10 +481,10 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         position = movement.screw_positions[0]
 
     velocity = model.settings[movement.speed_type]
+
+    # Send movement to Clamp Controller, wait for ROS controller to ACK
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
     clamp_action_finished = False
-
-    # Wait for Clamp Controller to ACK
     while (True):
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
             logger_exe.info("RoboticClampSync Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
@@ -497,6 +496,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     guiref['exe']['last_completed_trajectory_point'].set(" - ")
     guiref['exe']['last_deviation'].set(" - ")
+
     # Execute robot trajectory step by step
     for current_step, point in enumerate(movement.trajectory.points):
         if current_step < active_point:
@@ -550,7 +550,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
                 clamp_action_finished = True  # What is left is for the robot to finish
     model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Completed']))
 
-    # Final deviation
+    # * Final deviation
     deviation = check_deviation(model, movement.target_frame)
     if deviation is not None:
         logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
@@ -688,7 +688,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     logger_exe.info("Jogged Cartsian Offset = %s (amount = %4g mm)" % (offset, offset.length))
 
     # Compute Joint 6 offset
-    end_state_robot_joints = to_degrees(movement.end_state['robot'].kinematic_config.values[3:10])
+    end_state_robot_joints = to_degrees(movement.end_state['robot'].kinematic_config.revolute_values)
     joint_6_offset = new_robot_joints[5] - end_state_robot_joints[5]
     logger_exe.info("Jogged joint 6 offset = %s deg" % (joint_6_offset))
 

@@ -223,9 +223,9 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     return False
 
                 # Construct and send rrc command
-                state = model.process.get_movement_start_state(movement)
+                config = model.process.get_movement_start_robot_config(movement)
                 message = "Jogging to START State of %s " % movement.movement_id
-                jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
+                jog_thread = Thread(target=execute_jog_robot_to_config, args=(guiref, model, config, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
@@ -241,9 +241,9 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     return False
 
                 # Construct and send rrc command
-                state = model.process.get_movement_end_state(movement)
+                config = model.process.get_movement_end_robot_config(movement)
                 message = "Jogging to End State of %s " % movement.movement_id
-                jog_thread = Thread(target=execute_jog_robot_to_state, args=(guiref, model, state, message, q), daemon=True)
+                jog_thread = Thread(target=execute_jog_robot_to_config, args=(guiref, model, config, message, q), daemon=True)
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
