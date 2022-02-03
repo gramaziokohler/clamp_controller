@@ -508,9 +508,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='CLI RobotClampExecution.')
     parser.add_argument('-f', default='',  help='Load Process File on Start')
-    parser.add_argument('-robotip', default='192.168.0.117',
+    parser.add_argument('-robotip', default='192.168.0.120',
                         help='IP for Robot ROS Host')
-    parser.add_argument('-clampip', default='192.168.0.117',
+    parser.add_argument('-clampip', default='192.168.0.120',
                         help='IP for Clamp ROS Host')
     args = parser.parse_args()
     print(args)
