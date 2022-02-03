@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     # * Code to create Controller Object. It returns guiref dictionary for background thread to act on
     root = tk.Tk()  # Root TK Object
-    root.title("Tokyo Clamps Commander")
+    root.title("4 Clamps 4 Screwdriver Commander")
     root.geometry("1800x800")
     q = queue.Queue()  # Command queue
     guiref = create_commander_gui(root, q, commander.clamps.values())
