@@ -198,7 +198,7 @@ class RobotClampExecutionModel(object):
             ros = RosClient(ip)
             # This runs in a separate thread
             ros.run()
-            self.ros_robot = rrc.AbbClient(ros, '/robot_11')
+            self.ros_robot = rrc.AbbClient(ros, '/rob1')
             time.sleep(0.5)
             logger_model.info("ABB Robot ROS host connected")
             return True
