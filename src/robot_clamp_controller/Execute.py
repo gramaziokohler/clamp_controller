@@ -80,11 +80,17 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     elif isinstance(movement, OperatorAddJogOffset):
         return execute_operator_add_jog_offset_movement(guiref, model, movement)
 
-    elif isinstance(movement, RemoveOperatorOffset):
-        return execute_remove_operator_offset_movement(guiref, model, movement)
+    elif isinstance(movement, AcquireDockingOffset):
+        return execute_acquire_docking_offset(guiref, model, movement)
 
     elif isinstance(movement, OperatorAddVisualOffset):
         return execute_operator_add_visual_offset_movement(guiref, model, movement)
+
+    elif isinstance(movement, RemoveOperatorOffset):
+        return execute_remove_operator_offset_movement(guiref, model, movement)
+
+    elif isinstance(movement, CancelRobotOffset):
+        return execute_remove_operator_offset_movement(guiref, model, movement)
 
     # Catch all during Development
     else:
@@ -807,7 +813,37 @@ def execute_operator_add_visual_offset_movement(guiref, model: RobotClampExecuti
     else:
         return False
 
-    # Movement to go to
+
+def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset):
+    """Performs AcquireDockingOffset by retriving the docking marker location.
+    """
+    if (model.ros_clamps is None) or not model.ros_clamps.is_connected:
+        logger_exe.info(
+            "AcquireDockingOffset cannot start because Clamp ROS is not connected")
+        return False
+
+    if not model.process.movement_has_end_robot_config(movement):
+        logger_exe.warn("Error Attempt to execute execute_acquire_docking_offset but the movement end_state does not have robot config.")
+        return False
+
+    camera_stream_name = movement.tool_id
+    logger_exe.info("Waiting for marker from camera %s" % (movement.tool_id))
+    model.ros_clamps.markers_transformation[camera_stream_name] = None
+    model.ros_clamps.subscribe_ROS_Marker_COMMAND(camera_stream_name)
+
+    # Wait for marker transformation to come back
+    while (True):
+        # Check if clamps are running or not
+        if model.ros_clamps.markers_transformation[camera_stream_name] != None:
+            t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name]
+            logger_exe.info("AcquireDockingOffset (%s) received t_camera_from_marker = " % (camera_stream_name, t_camera_from_marker))
+            return compute_marker_correction(guiref, model, movement)
+
+        # Check if user pressed stop button in UI
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warn(
+                "UI stop button pressed before AcquireDockingOffset (%s) is completed." % movement.movement_id)
+            return False
 
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
@@ -890,6 +926,27 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
 #########################################
 # Visual Correction Helper Functions
 #########################################
+def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset):
+    """Compute the gantry offset from the marker position.
+    The movement must have a target_frame"""
+
+    # Retrive the selected movement target frame
+    if not hasattr(movement, 'target_frame'):
+        logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
+        return False
+    current_movement_target_frame = movement.target_frame
+
+    camera_stream_name = movement.tool_id
+    t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name]
+
+    T = Transformation.from_frame(current_movement_target_frame)
+    flange_vector = Vector(align_X, align_Y, align_Z)
+    world_vector = flange_vector.transformed(T)
+    guiref['offset']['Ext_X'].set("%.4g" % round(world_vector.x, 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
+    logger_model.info("Visual correction of Flange %s from Flange %s. Resulting in World %s" % (flange_vector, current_movement_target_frame, world_vector))
+    return True
 
 
 def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement: RoboticMovement):
@@ -982,11 +1039,12 @@ def robot_state_to_instruction(guiref, model: RobotClampExecutionModel, robot_co
                                apply_offset: bool = True):
     """Create rrc.MoveToJoints instruction from robot_state
     apply offset set in the gui if apply_offset is true"""
-    assert len(robot_config.values) == 9
+    assert len(robot_config.prismatic_values) == 3
+    assert len(robot_config.revolute_values) == 6
 
     # Ext Axis and Joint Values
-    ext_values = to_millimeters(robot_config.values[0:3])
-    joint_values = to_degrees(robot_config.values[3:10])
+    ext_values = to_millimeters(robot_config.prismatic_values)
+    joint_values = to_degrees(robot_config.revolute_values)
 
     # Apply Axis / Joints Offsets
     if apply_offset:
