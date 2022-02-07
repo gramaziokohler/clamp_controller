@@ -19,6 +19,7 @@ import roslibpy
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 from roslibpy import Ros
+from typing import List, Dict, Tuple
 import compas
 
 class RemoteClampFunctionCall(Ros):
@@ -126,24 +127,25 @@ class RemoteClampFunctionCall(Ros):
         return False
 
     # Returns the sequence_id of sent message
-    def send_ROS_GRIPPER_OPEN_COMMAND(self, screwdriver_id):
-        """send_ROS_VEL_GOTO_COMMAND(self, screwdriver_id: str) -> int:"""
-        return self.send_ros_command("ROS_GRIPPER_OPEN_COMMAND",screwdriver_id)
+    def send_ROS_GRIPPER_OPEN_COMMAND(self, screwdriver_id: str):
+        """Move grippers on a screwdriver to open / retracted position."""
+        return self.send_ros_command("ROS_GRIPPER_OPEN_COMMAND", screwdriver_id)
 
-    def send_ROS_GRIPPER_CLOSE_COMMAND(self, screwdriver_id):
-        """send_ROS_VEL_GOTO_COMMAND(self, screwdriver_id: str) -> int:"""
-        return self.send_ros_command("ROS_GRIPPER_CLOSE_COMMAND",screwdriver_id)
+    def send_ROS_GRIPPER_CLOSE_COMMAND(self, screwdriver_id: str):
+        """Move grippers on a screwdriver to close / extended position."""
+        return self.send_ros_command("ROS_GRIPPER_CLOSE_COMMAND", screwdriver_id)
 
     # Returns the sequence_id of sent message
-    def send_ROS_VEL_GOTO_COMMAND(self, clamps_id, position, velocity):
-        """send_ROS_VEL_GOTO_COMMAND(self, clamps_id: str, position: float, velocity: float) -> int:"""
+    def send_ROS_VEL_GOTO_COMMAND(self, clamps_id: List[str], position: float, velocity: float):
+        """Move multiple clamps to the same position using same velocity"""
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id, position, velocity))
         return self.send_ros_command("ROS_VEL_GOTO_COMMAND",instructions)
 
     # Returns the sequence_id of sent message
-    def send_ROS_STOP_COMMAND(self, clamps_id):
+    def send_ROS_STOP_COMMAND(self, clamps_id: List[str]):
+        "Stop multiple clamps"
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id))

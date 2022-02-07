@@ -4,6 +4,7 @@ import tkinter.font as tkFont
 from enum import Enum
 from queue import Queue
 from tkinter import ttk
+from typing import List, Tuple
 from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
@@ -28,9 +29,29 @@ class BackgroundCommand(Enum):
     CMD_SCREWDRIVER_VELO = 16
     CMD_SCREWDRIVER_GRIPPER = 17
     # Commands coming from ROS
-    ROS_VEL_GOTO_COMMAND = 20
-    ROS_STOP_COMMAND = 21
-    ROS_SCREWDRIVER_GRIPPER_COMMAND = 22
+    # ROS_VEL_GOTO_COMMAND = ROS_VEL_GOTO_COMMAND
+    # ROS_STOP_COMMAND = ROS_STOP_COMMAND
+    # ROS_SCREWDRIVER_GRIPPER_COMMAND = ROS_SCREWDRIVER_GRIPPER_COMMAND
+
+class ROS_COMMAND(object):
+    def __init__(self, sequence_id: int):
+        self.sequence_id = sequence_id
+
+class ROS_VEL_GOTO_COMMAND(ROS_COMMAND):
+    def __init__(self, sequence_id: int, clamps_pos_velo: List[Tuple[str, float, float]]):
+        super().__init__(sequence_id)
+        self.clamps_pos_velo = clamps_pos_velo
+
+class ROS_STOP_COMMAND(ROS_COMMAND):
+    def __init__(self, sequence_id: int, tools_id: List[str]):
+        super().__init__(sequence_id)
+        self.tools_id = tools_id
+
+class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND):
+    def __init__(self, sequence_id: int, tool_id: str, extend: bool):
+        super().__init__(sequence_id)
+        self.tool_id = tool_id
+        self.extend = extend
 
 
 def create_commander_gui(root, q: Queue, clamps):
