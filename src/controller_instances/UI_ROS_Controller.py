@@ -298,7 +298,7 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
 
             # Keep track if the command is completed successful.
             # This will be set back to true by the sync watcher
-            commander.last_command_success = False
+            # commander.last_command_success = False
 
             # Instruct commander to send command
             successes = commander.set_screwdriver_gripper([device_to_communicate], this_message.extend)

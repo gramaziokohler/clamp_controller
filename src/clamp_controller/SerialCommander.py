@@ -353,7 +353,7 @@ class SerialCommander(object):
         return successes
 
     def set_screwdriver_gripper(self, devices: List[ScrewdriverModel], extend: bool, retry: int = 3) -> List[bool]:
-        """Stop multiple clamps
+        """Move Screwdriver Gripper to Extend or Retract State Location
         """
         successes = []
         for device in devices:
