@@ -255,7 +255,7 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
                 # Get the clamp objects from commander
-                clamps_to_communicate = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in msg.tool_id]
+                clamps_to_communicate = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in msg.instructions]
                 # Instruct commander to send command
                 result = commander.stop_clamps(clamps_to_communicate)
                 logger_ctr.info("ROS_STOP_COMMAND Executed: Stop command to %s, result = %s" % (clamps_to_communicate, result))
