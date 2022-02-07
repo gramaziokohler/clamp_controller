@@ -69,7 +69,8 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     elif isinstance(movement, RoboticDigitalOutput):
         tool_id = movement.tool_id  # type: str
         tool_type = type(model.process.tool(tool_id))
-        if tool_type == Screwdriver:
+        digital_output = movement.digital_output
+        if (digital_output == DigitalOutput.OpenGripper or digital_output == DigitalOutput.CloseGripper) and tool_type == Screwdriver:
             return execute_robotic_digital_output_screwdriver(guiref, model, movement)
         else:
             return execute_robotic_digital_output(guiref, model, movement)
@@ -258,7 +259,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
         # Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warn("Screwdriver Gripper Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
-            model.ros_clamps.send_ROS_STOP_COMMAND(movement.tool_id)
+            model.ros_clamps.send_ROS_STOP_COMMAND([movement.tool_id])
             return False
 
     model.ros_clamps.sync_move_inaction = True
@@ -792,6 +793,32 @@ class VisualOffsetPopup(object):
     def cancel(self):
         self.model.run_status = RunStatus.STOPPED
         self.accpet = False
+        self.window.destroy()
+
+
+class MovementJsonPopup(object):
+
+    def __init__(self, guiref,  model: RobotClampExecutionModel, movement: Movement):
+        self.window = tk.Toplevel(guiref['root'])
+        self.guiref = guiref
+        self.model = model
+        self.movement = movement
+
+        tk.Label(self.window, text="Offset from the camera target (mm)?").grid(row=0, column=0)
+
+        # Entry Box for XYZ
+        # self.offset_x = tk.StringVar(value="0")
+        t = tk.Text(self.window, height=200, width = 250)
+        t.grid(row=1, column=0)
+
+        from compas.utilities import DataEncoder
+        json_data = json.dumps(movement, indent=2, sort_keys=True, cls=DataEncoder)
+        t.insert(tk.END, json_data)
+
+        # Buttons
+        tk.Button(self.window, text='Close', command=self.close).grid(row=2, column=0)
+
+    def close(self):
         self.window.destroy()
 
 

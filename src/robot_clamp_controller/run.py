@@ -268,8 +268,15 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
             # Handelling TEST
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST):
                 tree_row_id = treeview_get_selected_id(guiref)
-                movement = model.movements[tree_row_id]
-                test(msg, guiref, model, movement)
+                if msg.id == 0:
+                    movement = model.movements[tree_row_id]
+                    test0(msg, guiref, model, movement)
+                elif msg.id == 1:
+                    if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST, check_selected_is_movement=True):
+                        movement = model.movements[tree_row_id]
+                        show_movement_json_popup(guiref, model, movement)
+                else:
+                    logger_ctr.error("Unhandled Test Msg, id = %s" % msg.id)
 
             # Returns True if a command is consumed
 
@@ -497,11 +504,16 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
                     guiref['exe']['clamps_last_cmd_success_label'].config(bg="red")
 
 
-def test(msg, guiref, model, movement):
+def test0(msg, guiref, model, movement):
     # Open a dialog and ask user to key in three offset values
     dialog = VisualOffsetPopup(guiref, model, movement)
     guiref['root'].wait_window(dialog.window)
     print("dialog.accpet = %s" % dialog.accpet)
+
+def show_movement_json_popup(guiref, model, movement):
+    # Open a dialog and ask user to key in three offset values
+    dialog = MovementJsonPopup(guiref, model, movement)
+    guiref['root'].wait_window(dialog.window)
 
 
 if __name__ == "__main__":

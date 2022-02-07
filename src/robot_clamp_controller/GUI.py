@@ -153,11 +153,17 @@ def create_ui_process(root, q: Queue):
     goto_beam_combobox.bind("<<ComboboxSelected>>", on_goto_beam_combobox_selected)
     ui_handles['goto_beam_combobox'] = goto_beam_combobox
 
-    def on_test_button_click(event=None):
-        q.put(SimpleNamespace(type=BackgroundCommand.TEST))
-    # Load Process Button
-    tk.Button(frame, text="Test",
-              command=on_test_button_click).pack(side=tk.LEFT, padx=6)
+    # Test button
+    def on_test_button0_click(event=None,):
+        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id = 0))
+    tk.Button(frame, text="TestButton0",
+              command=on_test_button0_click).pack(side=tk.LEFT, padx=6)
+
+    # Test button
+    def on_test_button1_click(event=None,):
+        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id = 1))
+    tk.Button(frame, text="TestButton1 - Show JSON",
+              command=on_test_button1_click).pack(side=tk.LEFT, padx=6)
 
     # Second Frame holds the treeview for process Movements and Actions List
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
