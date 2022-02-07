@@ -429,7 +429,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             break
 
 
-def initialize_logging(filename: str):
+def initialize_logging(filename: str, log_file_level = logging.DEBUG, console_level = logging.DEBUG):
     # Logging Setup
     logger = logging.getLogger("app")
     logger.setLevel(logging.DEBUG)
@@ -438,11 +438,11 @@ def initialize_logging(filename: str):
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # create file handler which logs even debug messages
     log_file_handler = logging.FileHandler(filename)
-    log_file_handler.setLevel(logging.DEBUG)
+    log_file_handler.setLevel(log_file_level)
     log_file_handler.setFormatter(formatter)
     # create console handler with a higher log level
     log_console_handler = logging.StreamHandler()
-    log_console_handler.setLevel(logging.INFO)
+    log_console_handler.setLevel(console_level)
     log_console_handler.setFormatter(formatter)
     # add the handlers to logger
     logger.addHandler(log_file_handler)
@@ -528,7 +528,9 @@ if __name__ == "__main__":
     print(args)
     # Initialize Logger
     initialize_logging("RobotClampExecution." +
-                       datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
+                       datetime.date.today().strftime("%Y-%m-%d") + ".debug.log",
+                       console_level = logging.INFO,
+                       log_file_level = logging.DEBUG)
 
     # Root TK Object
     root = tk.Tk()

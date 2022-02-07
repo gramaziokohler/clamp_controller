@@ -16,6 +16,8 @@ from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.ProcessModel import *
 from robot_clamp_controller.GUI import *
 
+from clamp_controller.ScrewdriverModel import g_status_dict
+
 logger_exe = logging.getLogger("app.exe")
 
 # Tool data settings in Robot Studio:
@@ -36,8 +38,7 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     This is a blocking call that returns only if a movement is completed
     or if model.run_status == RunStatus.STOPPED. """
 
-    logger_exe.info("Executing Movement (%s): %s" % (movement.movement_id, movement.tag))
-    logger_exe.info(" - %s" % movement)
+    logger_exe.info("Executing %s (%s): %s" % (movement, movement.movement_id, movement.tag))
 
     guiref['exe']['last_executed_movement'].set(movement.movement_id)
 
@@ -242,10 +243,12 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
     model.ros_clamps.last_command_success = None
     if movement.digital_output == DigitalOutput.OpenGripper:
         sequence_id = model.ros_clamps.send_ROS_GRIPPER_OPEN_COMMAND(movement.tool_id)
+        model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 2
         logger_exe.info("Sending send_ROS_GRIPPER_OPEN_COMMAND Movement (%s)" % (movement.movement_id))
     elif movement.digital_output == DigitalOutput.CloseGripper:
         sequence_id = model.ros_clamps.send_ROS_GRIPPER_CLOSE_COMMAND(movement.tool_id)
         logger_exe.info("Sending send_ROS_GRIPPER_CLOSE_COMMAND Movement (%s)" % (movement.movement_id))
+        model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 1
     else:
         logger_exe.error("Screwdriver Movement (%s) not supported for digital_output type: %s" % (movement.movement_id, movement.digital_output))
         return False
@@ -262,16 +265,18 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
             model.ros_clamps.send_ROS_STOP_COMMAND([movement.tool_id])
             return False
 
-    model.ros_clamps.sync_move_inaction = True
     model.ros_clamps.last_command_success = False
 
-    # Wait for clamp to complete
+    # Wait for screwdriver to complete
     while (True):
         # Check if clamps are running or not
-        if not model.ros_clamps.sync_move_inaction:
-            if model.ros_clamps.last_command_success:
+        # g_status 1 or 2 is moving, 3 or 4 is success, 5 or 6 is fail
+        raw_gripper_status = model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status']
+        if raw_gripper_status not in [1,2]:
+            if raw_gripper_status in [3,4]:
                 logger_exe.info("Screwdriver Gripper Movement (%s) completed." % movement.movement_id)
                 logger_exe.info("Screwdriver %s status: %s" % (movement.tool_id, model.ros_clamps.clamps_status[movement.tool_id]))
+                model.ros_clamps.last_command_success = True
                 return True
             else:
                 logger_exe.info("Screwdriver Gripper Movement (%s) stopped or jammed." % movement.movement_id)
