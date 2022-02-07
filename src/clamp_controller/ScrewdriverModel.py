@@ -143,6 +143,7 @@ class ScrewdriverModel(object):
         data['raw_statusCode'] = self._raw_statusCode
         data['raw_battery'] = self._raw_battery
         data['is_running'] = self.isMotorRunning
+        data['raw_gripper_status'] = self._raw_gripper_status
 
         return data
 
