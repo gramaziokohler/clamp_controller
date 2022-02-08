@@ -53,6 +53,9 @@ class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND):
         self.tool_id = tool_id
         self.extend = extend
 
+class ROS_REQUEST_STATUSUPDATE(ROS_COMMAND):
+    def __init__(self, sequence_id: int):
+        super().__init__(sequence_id)
 
 def create_commander_gui(root, q: Queue, clamps):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)

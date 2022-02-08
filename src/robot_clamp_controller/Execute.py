@@ -239,6 +239,19 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
             "Screwdriver gripper movement cannot start because Clamp ROS is not connected")
         return False
 
+    # Ping Screwdriver Controller and get a status update\
+    model.ros_clamps.send_ros_command("ROS_REQUEST_STATUSUPDATE", None)
+    timeout_threshold = 2
+    start = time.time()
+    model.ros_clamps.clamps_status = {}
+    while(time.time() < start + timeout_threshold):
+        if model.ros_clamps.clamps_status != {}:
+            break
+    if model.ros_clamps.clamps_status == {}:
+        logger_exe.error("Screwdriver Controller did not respond with status update request.")
+        return False
+
+
     # Remove clamp prefix:
     model.ros_clamps.last_command_success = None
     if movement.digital_output == DigitalOutput.OpenGripper:
