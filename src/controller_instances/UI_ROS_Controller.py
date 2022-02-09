@@ -394,7 +394,7 @@ def update_status(guiref, commander: SerialCommander):
             if clamp._last_set_position is not None:
                 guiref['status'][clamp.receiver_address]['last_pos'].set("%04.1fmm" % clamp._last_set_position)
             if clamp._last_set_velocity is not None:
-                guiref['status'][clamp.receiver_address]['last_vel'].set("%3.1fmm/s" % clamp._last_set_velocity)
+                guiref['status'][clamp.receiver_address]['last_vel'].set("%3.2fmm/s" % clamp._last_set_velocity)
 
             # * Update Screwdriver specific values
             if isinstance(clamp, ScrewdriverModel):
