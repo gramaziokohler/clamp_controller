@@ -181,8 +181,8 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 velocity = msg.velocity
                 clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
                 clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ClampModel]
-                logger_ctr.info("Sending Velocity command (%s) to Clamps %s, results = %s" % (velocity, clamps_to_communicate, results))
                 results = commander.set_clamps_velocity(clamps_to_communicate, velocity)
+                logger_ctr.info("Sending Velocity command (%s) to Clamps %s, results = %s" % (velocity, clamps_to_communicate, results))
                 return True
 
             # * Handelling CMD_SCREWDRIVER_VELO

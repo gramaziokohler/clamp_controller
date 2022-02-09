@@ -251,7 +251,6 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
         logger_exe.error("Screwdriver Controller did not respond with status update request.")
         return False
 
-
     # Remove clamp prefix:
     model.ros_clamps.last_command_success = None
     if movement.digital_output == DigitalOutput.OpenGripper:
@@ -271,6 +270,10 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
             logger_exe.info("Screwdriver Gripper Movement (%s) Started" % (movement.movement_id))
             break
+
+        if model.ros_clamps.last_command_success == False:
+            logger_exe.warn("Screwdriver Gripper Movement (%s) refused by tool controller." % (movement.movement_id))
+            return False
 
         # Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
@@ -873,16 +876,28 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
     camera_stream_name = movement.tool_id
     logger_exe.info("Waiting for marker from camera %s" % (movement.tool_id))
-    model.ros_clamps.markers_transformation[camera_stream_name] = None
-    model.ros_clamps.subscribe_ROS_Marker_COMMAND(camera_stream_name)
+    model.ros_clamps.markers_transformation[camera_stream_name] = []
+
+    def markers_transformation_callback(message_string):
+
+        # Print it to UI and keep track of one way latency.
+        T = Transformation.from_data(json.loads(message_string['data']))
+        model.ros_clamps.markers_transformation[camera_stream_name].append(T)
+        logger_exe.info("Received message_string = %s" % (message_string))
+
+    import roslibpy
+    listener = roslibpy.Topic(model.ros_clamps, '/'+ camera_stream_name, 'std_msgs/String')
+    listener.subscribe(markers_transformation_callback)
+
 
     # Wait for marker transformation to come back
     while (True):
-        # Check if clamps are running or not
-        if model.ros_clamps.markers_transformation[camera_stream_name] != None:
-            t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name]
-            logger_exe.info("AcquireDockingOffset (%s) received t_camera_from_marker = " % (camera_stream_name, t_camera_from_marker))
-            return compute_marker_correction(guiref, model, movement)
+        # Check if camera frame have arrived or not
+        if len(model.ros_clamps.markers_transformation[camera_stream_name]) > 10:
+            t_camera_from_observedmarker = model.ros_clamps.markers_transformation[camera_stream_name][-1]
+            logger_exe.info("AcquireDockingOffset stream = %s received t_camera_from_marker = %s" % (camera_stream_name, t_camera_from_observedmarker))
+            listener.unsubscribe()
+            return compute_marker_correction(guiref, model, movement, t_camera_from_observedmarker)
 
         # Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
@@ -890,6 +905,9 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
                 "UI stop button pressed before AcquireDockingOffset (%s) is completed." % movement.movement_id)
             return False
 
+    # TODO
+    # Add check to prompt user if the correction value is too large.
+    # Add movement to apply correction.
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
@@ -971,7 +989,7 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
 #########################################
 # Visual Correction Helper Functions
 #########################################
-def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset):
+def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset, t_camera_from_observedmarker: Transformation):
     """Compute the gantry offset from the marker position.
     The movement must have a target_frame"""
 
@@ -980,17 +998,39 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
         logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
         return False
     current_movement_target_frame = movement.target_frame
+    t_world_from_currentflange = Transformation.from_frame(current_movement_target_frame)
 
-    camera_stream_name = movement.tool_id
-    t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name]
+    # * From CAD
+    json_path = "C:\\Users\\leungp\\Documents\\GitHub\\clamp_controller\\calibrations\\TC4_Camera_t_flange_from_marker.json"
+    with open(json_path, 'r') as f:
+        t_flange_from_marker = json.load(f, cls=DataDecoder)
 
-    T = Transformation.from_frame(current_movement_target_frame)
-    flange_vector = Vector(align_X, align_Y, align_Z)
-    world_vector = flange_vector.transformed(T)
-    guiref['offset']['Ext_X'].set("%.4g" % round(world_vector.x, 4))
-    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * world_vector.y, 4))
-    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * world_vector.z, 4))
-    logger_model.info("Visual correction of Flange %s from Flange %s. Resulting in World %s" % (flange_vector, current_movement_target_frame, world_vector))
+    # * From Marker Calibration
+    json_path = "C:\\Users\\leungp\\Documents\\GitHub\\clamp_controller\\calibrations\\TC4_Camera_t_camera_from_marker.json"
+    with open(json_path, 'r') as f:
+        t_camera_from_marker = json.load(f, cls=DataDecoder)
+
+    # * Observation: Observed Marker in Camera Frame
+    t_camera_from_observedmarker = t_camera_from_observedmarker
+
+    # * Calcualtion: Camera in Flange Frame
+    t_flange_from_camera = t_flange_from_marker * t_camera_from_marker.inverse()
+
+    # * Calculation: New Flange Frame in current flange frame
+    t_observedmarker_from_newflange = t_flange_from_marker.inverse()
+    t_flange_from_newflange = t_flange_from_camera * t_camera_from_observedmarker * t_observedmarker_from_newflange # type: Transformation
+
+    v_world_flange_correction = t_flange_from_newflange.translation_vector.transformed(t_world_from_currentflange)
+
+    # camera_stream_name = movement.tool_id
+    # t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name][-1]
+
+    # T = Transformation.from_frame(current_movement_target_frame)
+    # world_vector = flange_correction_vector.transformed(T)
+    guiref['offset']['Ext_X'].set("%.4g" % round(v_world_flange_correction.x, 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * v_world_flange_correction.y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * v_world_flange_correction.z, 4))
+    logger_exe.info("Marker correction t_flange_from_newflange = %s , v_world_flange_correction = %s" % (t_flange_from_newflange.translation_vector, v_world_flange_correction))
     return True
 
 
@@ -1003,7 +1043,7 @@ def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement:
 
     # Retrive the selected movement target frame
     if not hasattr(movement, 'target_frame'):
-        logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
+        logger_exe.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
         return False
     current_movement_target_frame = movement.target_frame
 
