@@ -907,6 +907,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
     # TODO
     # Add check to prompt user if the correction value is too large.
+    # robot_config
     # Add movement to apply correction.
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
@@ -993,6 +994,11 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
     """Compute the gantry offset from the marker position.
     The movement must have a target_frame"""
 
+    # Store existing offset values
+    prev_offset_x = float(guiref['offset']['Ext_X'].get())
+    prev_offset_y = float(guiref['offset']['Ext_Y'].get())
+    prev_offset_z = float(guiref['offset']['Ext_Z'].get())
+
     # Retrive the selected movement target frame
     if not hasattr(movement, 'target_frame'):
         logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
@@ -1019,18 +1025,25 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
     # * Calculation: New Flange Frame in current flange frame
     t_observedmarker_from_newflange = t_flange_from_marker.inverse()
     t_flange_from_newflange = t_flange_from_camera * t_camera_from_observedmarker * t_observedmarker_from_newflange # type: Transformation
+    v_flange_correction = t_flange_from_newflange.translation_vector
+    v_world_flange_correction = v_flange_correction.transformed(t_world_from_currentflange)
 
-    v_world_flange_correction = t_flange_from_newflange.translation_vector.transformed(t_world_from_currentflange)
+    # * Convert correction vector to gantry offset values
+    new_offset_x = prev_offset_x + v_world_flange_correction.x
+    new_offset_y = prev_offset_y + (-1 * v_world_flange_correction.y)
+    new_offset_z = prev_offset_z + (-1 * v_world_flange_correction.z)
 
-    # camera_stream_name = movement.tool_id
-    # t_camera_from_marker = model.ros_clamps.markers_transformation[camera_stream_name][-1]
+    guiref['offset']['Ext_X'].set("%.4g" % round(new_offset_x, 4))
+    guiref['offset']['Ext_Y'].set("%.4g" % round(new_offset_y, 4))
+    guiref['offset']['Ext_Z'].set("%.4g" % round(new_offset_z, 4))
 
-    # T = Transformation.from_frame(current_movement_target_frame)
-    # world_vector = flange_correction_vector.transformed(T)
-    guiref['offset']['Ext_X'].set("%.4g" % round(v_world_flange_correction.x, 4))
-    guiref['offset']['Ext_Y'].set("%.4g" % round(-1 * v_world_flange_correction.y, 4))
-    guiref['offset']['Ext_Z'].set("%.4g" % round(-1 * v_world_flange_correction.z, 4))
-    logger_exe.info("Marker correction t_flange_from_newflange = %s , v_world_flange_correction = %s" % (t_flange_from_newflange.translation_vector, v_world_flange_correction))
+    logger_exe.info("Marker correction t_flange_from_newflange = %s , v_world_flange_correction = %s" % (v_flange_correction, v_world_flange_correction))
+    correction_amount_XY = Vector(v_flange_correction.x, v_flange_correction.y).length
+    correction_amount_Z = v_flange_correction.z
+    logger_exe.info("Correction amount (relative to current position) in Flange Coordinates: XY = %1.2f , Z = %1.2f" % (correction_amount_XY, correction_amount_Z))
+
+    # Prompt user if the correction amount is too much
+
     return True
 
 
