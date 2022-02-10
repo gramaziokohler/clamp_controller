@@ -876,39 +876,97 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
     camera_stream_name = movement.tool_id
     logger_exe.info("Waiting for marker from camera %s" % (movement.tool_id))
-    model.ros_clamps.markers_transformation[camera_stream_name] = []
 
+
+    import roslibpy
     def markers_transformation_callback(message_string):
 
         # Print it to UI and keep track of one way latency.
         T = Transformation.from_data(json.loads(message_string['data']))
         model.ros_clamps.markers_transformation[camera_stream_name].append(T)
-        logger_exe.info("Received message_string = %s" % (message_string))
+        logger_exe.debug("Received message_string = %s" % (message_string))
 
-    import roslibpy
-    listener = roslibpy.Topic(model.ros_clamps, '/'+ camera_stream_name, 'std_msgs/String')
-    listener.subscribe(markers_transformation_callback)
+    # * Wait for marker transformation to come back
+    max_iteration = 5
+    for i in range(max_iteration):
+        # * Reset list of observed transforamtion
+        model.ros_clamps.markers_transformation[camera_stream_name] = []
+        listener = roslibpy.Topic(model.ros_clamps, '/'+ camera_stream_name, 'std_msgs/String')
+        listener.subscribe(markers_transformation_callback)
 
+        # * Store existing offset values
+        prev_offset = []
+        prev_offset.append(float(guiref['offset']['Ext_X'].get()))
+        prev_offset.append(float(guiref['offset']['Ext_Y'].get()))
+        prev_offset.append(float(guiref['offset']['Ext_Z'].get()))
 
-    # Wait for marker transformation to come back
-    while (True):
-        # Check if camera frame have arrived or not
-        if len(model.ros_clamps.markers_transformation[camera_stream_name]) > 10:
-            t_camera_from_observedmarker = model.ros_clamps.markers_transformation[camera_stream_name][-1]
-            logger_exe.info("AcquireDockingOffset stream = %s received t_camera_from_marker = %s" % (camera_stream_name, t_camera_from_observedmarker))
-            listener.unsubscribe()
-            return compute_marker_correction(guiref, model, movement, t_camera_from_observedmarker)
+        # * Acquire camera transformation and compute offset
+        _last_check_index = 0
+        while (True):
+            # Check if camera frame have arrived or not
 
-        # Check if user pressed stop button in UI
-        if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn(
-                "UI stop button pressed before AcquireDockingOffset (%s) is completed." % movement.movement_id)
+            num_markers = len(model.ros_clamps.markers_transformation[camera_stream_name])
+            if num_markers > 5 and num_markers > _last_check_index:
+
+                # * Double check the last two frames are agreeing with each other
+                t_camera_from_observedmarker = model.ros_clamps.markers_transformation[camera_stream_name][-1]
+                new_offset, correction_amount_XY, correction_amount_Z = compute_marker_correction(guiref, model, movement, t_camera_from_observedmarker)
+                t_camera_from_observedmarker_2 = model.ros_clamps.markers_transformation[camera_stream_name][-2]
+                new_offset_2, _, _ = compute_marker_correction(guiref, model, movement, t_camera_from_observedmarker_2)
+                agreeable_threshold = 0.2
+                difference = [abs(i-j) for i, j in zip(new_offset, new_offset_2)]
+
+                # * If all difference agree, they can be
+                if all([d < agreeable_threshold for d in difference]):
+                    logger_exe.info("AcquireDockingOffset stream = %s attempt %s received t_camera_from_marker = %s" % (camera_stream_name, i, t_camera_from_observedmarker))
+                    listener.unsubscribe()
+                    break
+                else:
+                    logger_exe.info("AcquireDockingOffset last 2 frames correction larger than agreeable_threshold (%s) Difference = %s" % (agreeable_threshold, difference))
+                _last_check_index = num_markers
+
+            # Check if user pressed stop button in UI
+            if model.run_status == RunStatus.STOPPED:
+                logger_exe.warn(
+                    "UI stop button pressed before AcquireDockingOffset (%s) is completed." % movement.movement_id)
+                listener.unsubscribe()
+                return False
+
+        # * If the offsets are smaller than threshold (converged), break from multiple run loop and return
+        convergence_XY = 1.0
+        convergence_Z = 0.5
+        if (correction_amount_XY < convergence_XY and correction_amount_Z < convergence_Z):
+            logger_exe.info("Correction converged below threshold in %i move: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" % (i + 1, correction_amount_XY, convergence_XY, correction_amount_Z, convergence_Z))
+            return True
+
+        # * Sanity check
+        correction_max = 30
+        if (correction_amount_XY > correction_max and correction_amount_Z > correction_max):
+            logger_exe.warn("Correction larger than allowable threshold: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" % (correction_amount_XY, correction_max, correction_amount_Z, correction_max))
             return False
 
-    # TODO
-    # Add check to prompt user if the correction value is too large.
-    # robot_config
-    # Add movement to apply correction.
+        logger_exe.info("Correction amount (relative to current position) (in Flange Coordinates): XY = %1.2f , Z = %1.2f" % (correction_amount_XY, correction_amount_Z))
+
+        # * Apply new offsets to existing offsets
+        guiref['offset']['Ext_X'].set("%.4g" % round(prev_offset[0] + new_offset[0], 4))
+        guiref['offset']['Ext_Y'].set("%.4g" % round(prev_offset[1] + new_offset[1], 4))
+        guiref['offset']['Ext_Z'].set("%.4g" % round(prev_offset[2] + new_offset[2], 4))
+        # * Move the robot to end config of movement with new offset
+        config = model.process.get_movement_end_robot_config(movement)
+        ext_values = apply_ext_offsets(guiref, to_millimeters(config.prismatic_values))
+        joint_values = apply_joint_offsets(guiref, to_degrees(config.revolute_values))
+
+        logger_exe.info("Moving robot to new offset value.")
+        instruction = rrc.MoveToJoints(joint_values, ext_values, 500, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE)
+        future = send_and_wait_unless_cancel(model, instruction)
+        if future.done:
+            logger_exe.info("Robot move to new offset value complete.")
+        else:
+            logger_exe.warn("UI stop button pressed before MoveToJoints in AcquireDockingOffset Movement is completed.")
+            return False
+
+    logger_exe.warn("AcquireDockingOffset exhausted maxIteration %s without convergence" % max_iteration)
+    return False
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
@@ -990,14 +1048,16 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
 #########################################
 # Visual Correction Helper Functions
 #########################################
-def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset, t_camera_from_observedmarker: Transformation):
+def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset, t_camera_from_observedmarker: Transformation, ):
     """Compute the gantry offset from the marker position.
-    The movement must have a target_frame"""
+    The movement must have a target_frame.
 
-    # Store existing offset values
-    prev_offset_x = float(guiref['offset']['Ext_X'].get())
-    prev_offset_y = float(guiref['offset']['Ext_Y'].get())
-    prev_offset_z = float(guiref['offset']['Ext_Z'].get())
+    Returns  (new_offset, correction_amount_XY, correction_amount_Z)
+    - new_offset : three offset values that can be applied to gantry offset
+    - correction_amount_XY : Correction amount in the Flange's coordinates
+    - correction_amount_Z : Correction amount in the Flange's coordinates
+
+    """
 
     # Retrive the selected movement target frame
     if not hasattr(movement, 'target_frame'):
@@ -1007,12 +1067,16 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
     t_world_from_currentflange = Transformation.from_frame(current_movement_target_frame)
 
     # * From CAD
-    json_path = "C:\\Users\\leungp\\Documents\\GitHub\\clamp_controller\\calibrations\\TC4_Camera_t_flange_from_marker.json"
+    import clamp_controller
+    import os.path as path
+    camera_stream_name = movement.tool_id
+    clamp_controller_path = path.dirname(path.dirname(path.dirname(clamp_controller.__file__)))
+    json_path = path.join(clamp_controller_path, "calibrations", camera_stream_name + "_t_flange_from_marker.json")
     with open(json_path, 'r') as f:
         t_flange_from_marker = json.load(f, cls=DataDecoder)
 
     # * From Marker Calibration
-    json_path = "C:\\Users\\leungp\\Documents\\GitHub\\clamp_controller\\calibrations\\TC4_Camera_t_camera_from_marker.json"
+    json_path = path.join(clamp_controller_path, "calibrations", camera_stream_name + "_t_camera_from_marker.json")
     with open(json_path, 'r') as f:
         t_camera_from_marker = json.load(f, cls=DataDecoder)
 
@@ -1029,22 +1093,16 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
     v_world_flange_correction = v_flange_correction.transformed(t_world_from_currentflange)
 
     # * Convert correction vector to gantry offset values
-    new_offset_x = prev_offset_x + v_world_flange_correction.x
-    new_offset_y = prev_offset_y + (-1 * v_world_flange_correction.y)
-    new_offset_z = prev_offset_z + (-1 * v_world_flange_correction.z)
+    new_offset = []
+    new_offset.append(v_world_flange_correction.x)
+    new_offset.append(-1 * v_world_flange_correction.y)
+    new_offset.append(-1 * v_world_flange_correction.z)
 
-    guiref['offset']['Ext_X'].set("%.4g" % round(new_offset_x, 4))
-    guiref['offset']['Ext_Y'].set("%.4g" % round(new_offset_y, 4))
-    guiref['offset']['Ext_Z'].set("%.4g" % round(new_offset_z, 4))
-
-    logger_exe.info("Marker correction t_flange_from_newflange = %s , v_world_flange_correction = %s" % (v_flange_correction, v_world_flange_correction))
+    # logger_exe.info("Marker correction t_flange_from_newflange = %s , v_world_flange_correction = %s" % (v_flange_correction, v_world_flange_correction))
     correction_amount_XY = Vector(v_flange_correction.x, v_flange_correction.y).length
     correction_amount_Z = v_flange_correction.z
-    logger_exe.info("Correction amount (relative to current position) in Flange Coordinates: XY = %1.2f , Z = %1.2f" % (correction_amount_XY, correction_amount_Z))
 
-    # Prompt user if the correction amount is too much
-
-    return True
+    return (new_offset, correction_amount_XY, correction_amount_Z)
 
 
 def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement: RoboticMovement):
