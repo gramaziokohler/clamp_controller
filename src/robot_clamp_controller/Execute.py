@@ -971,7 +971,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
         convergence_Z = 0.5
         if (correction_amount_XY < convergence_XY and correction_amount_Z < convergence_Z):
             logger_exe.info("Correction converged below threshold in %i move: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" %
-                            (i + 1, correction_amount_XY, convergence_XY, correction_amount_Z, convergence_Z))
+                            (i, correction_amount_XY, convergence_XY, correction_amount_Z, convergence_Z))
             return True
 
         # * Sanity check
