@@ -429,7 +429,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             break
 
 
-def initialize_logging(filename: str, log_file_level = logging.DEBUG, console_level = logging.DEBUG):
+def initialize_logging(filename: str, log_file_level=logging.DEBUG, console_level=logging.DEBUG):
     # Logging Setup
     logger = logging.getLogger("app")
     logger.setLevel(logging.DEBUG)
@@ -510,6 +510,7 @@ def test0(msg, guiref, model, movement):
     guiref['root'].wait_window(dialog.window)
     print("dialog.accpet = %s" % dialog.accpet)
 
+
 def show_movement_json_popup(guiref, model, movement):
     # Open a dialog and ask user to key in three offset values
     dialog = MovementJsonPopup(guiref, model, movement)
@@ -529,8 +530,8 @@ if __name__ == "__main__":
     # Initialize Logger
     initialize_logging("RobotClampExecution." +
                        datetime.date.today().strftime("%Y-%m-%d") + ".debug.log",
-                       console_level = logging.INFO,
-                       log_file_level = logging.DEBUG)
+                       console_level=logging.INFO,
+                       log_file_level=logging.DEBUG)
 
     # Root TK Object
     root = tk.Tk()

@@ -13,21 +13,22 @@
 
 # Directly running this file creates a CLI for sending movement commands.
 
-import time, datetime
+import compas
+from typing import List, Dict, Tuple
+from roslibpy import Ros
+import time
+import datetime
 import json
 import roslibpy
-current_milli_time = lambda: int(round(time.time() * 1000))
+def current_milli_time(): return int(round(time.time() * 1000))
 
-from roslibpy import Ros
-from typing import List, Dict, Tuple
-import compas
 
 class RemoteClampFunctionCall(Ros):
 
     def __init__(self, host_ip, status_change_callback=None):
         if not compas.IPY:
             from twisted.internet import reactor
-            reactor.timeout = lambda : 0.00001
+            reactor.timeout = lambda: 0.00001
 
         Ros.__init__(self, host=host_ip, port=9090)
 
@@ -57,14 +58,13 @@ class RemoteClampFunctionCall(Ros):
             t1t = bounce_time - send_time
             t2t = receive_time - bounce_time
             # print ("Received; %s" % feedback_message)
-            print ("Received Message %s, RoundTripTime = %s (%s + %s)" % (sequence_id, rtt, t1t, t2t))
+            print("Received Message %s, RoundTripTime = %s (%s + %s)" % (sequence_id, rtt, t1t, t2t))
             self.trip_times.append(rtt)
 
             if 'ack' in feedback_message:
                 ack_success = int(feedback_message['ack'])
                 self.sent_messages_ack[sequence_id] = ack_success
-                print ('Received Message: ack received = %s' % ack_success)
-
+                print('Received Message: ack received = %s' % ack_success)
 
         # Setup talker to send message
         self.talker = roslibpy.Topic(self, '/clamp_command', 'std_msgs/String')
@@ -85,7 +85,7 @@ class RemoteClampFunctionCall(Ros):
 
             self.clamps_status = data['status']
             self.sync_move_inaction = data['sync_move_inaction']
-            self.last_command_success =  data['last_command_success']
+            self.last_command_success = data['last_command_success']
 
         # Setup listener topic.
         self.listener = roslibpy.Topic(self, '/clamp_status', 'std_msgs/String')
@@ -93,7 +93,6 @@ class RemoteClampFunctionCall(Ros):
 
         # Send an initial message Sequence id will be -1
         self.send_ros_command("ROS_NEW_SENDER_INITIALIZE", "")
-
 
     def send_ros_command(self, instruction_type, instruction_body):
         """ Sends a ROS command to /clamp_command channel and returns the sequence_id of sent message
@@ -106,16 +105,16 @@ class RemoteClampFunctionCall(Ros):
         message['timestamp'] = current_milli_time()
         message['instruction_type'] = instruction_type
         message['instruction_body'] = instruction_body
-        self.talker.publish(roslibpy.Message({'data' : json.dumps(message)}))
+        self.talker.publish(roslibpy.Message({'data': json.dumps(message)}))
         # Keep track of sent message
-        message['received'] = False # Keep track of ACK.
+        message['received'] = False  # Keep track of ACK.
         self.sent_messages_ack[self.sequence_id] = message
         self.sequence_id += 1
         print("Sent Message to clamp_command:", message)
         return self.sequence_id - 1
 
     # Return true if sending is successful. False if timeout
-    def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id, position, velocity, timeout_ms = 1000):
+    def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id, position, velocity, timeout_ms=1000):
         """clamps_id: str, position: float, velocity: float, timeout_ms: int = 1000) -> bool:
         """
         start_time = current_milli_time()
@@ -141,7 +140,7 @@ class RemoteClampFunctionCall(Ros):
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id, position, velocity))
-        return self.send_ros_command("ROS_VEL_GOTO_COMMAND",instructions)
+        return self.send_ros_command("ROS_VEL_GOTO_COMMAND", instructions)
 
     # Returns the sequence_id of sent message
     def send_ROS_STOP_COMMAND(self, clamps_id: List[str]):
@@ -149,11 +148,12 @@ class RemoteClampFunctionCall(Ros):
         instructions = []
         for clamp_id in clamps_id:
             instructions.append((clamp_id))
-        return self.send_ros_command("ROS_STOP_COMMAND",instructions)
+        return self.send_ros_command("ROS_STOP_COMMAND", instructions)
 
     def terminate(self):
         self.talker.unadvertise()
         Ros.terminate(self)
+
 
 # CLI Loop
 if __name__ == "__main__":
@@ -166,7 +166,6 @@ if __name__ == "__main__":
 
     # Command to send clamp to target (blocking)
     # success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(100.0, 1.0, 1000)
-
 
     while clamps_connection.is_connected:
         i = input("Type a position (95-220) , velocity  (0.1 - 3.0) (to Send a test Message topic=/clamp_command , x to quit.\n")
@@ -184,16 +183,15 @@ if __name__ == "__main__":
                 position = float(_pos)
                 velocity = float(_vel)
                 if (position < 95.0 or position > 220.0):
-                    raise  ValueError
+                    raise ValueError
             except:
-                print ("Bad Input, position range (95-220). Try again:\n")
+                print("Bad Input, position range (95-220). Try again:\n")
                 continue
-            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['3'],position, velocity)
+            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['3'], position, velocity)
             if success:
-                print ("send_ROS_VEL_GOTO_COMMAND_wait() Message Success (Clamp Ack)")
+                print("send_ROS_VEL_GOTO_COMMAND_wait() Message Success (Clamp Ack)")
             else:
-                print ("send_ROS_VEL_GOTO_COMMAND_wait() Message Fail (NACK)")
+                print("send_ROS_VEL_GOTO_COMMAND_wait() Message Fail (NACK)")
         # place message in dict to allow later retrivel for time comparision.
 
     clamps_connection.terminate()
-

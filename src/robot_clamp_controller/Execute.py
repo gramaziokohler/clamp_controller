@@ -288,8 +288,8 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
         # Check if clamps are running or not
         # g_status 1 or 2 is moving, 3 or 4 is success, 5 or 6 is fail
         raw_gripper_status = model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status']
-        if raw_gripper_status not in [1,2]:
-            if raw_gripper_status in [3,4]:
+        if raw_gripper_status not in [1, 2]:
+            if raw_gripper_status in [3, 4]:
                 logger_exe.info("Screwdriver Gripper Movement (%s) completed." % movement.movement_id)
                 logger_exe.info("Screwdriver %s status: %s" % (movement.tool_id, model.ros_clamps.clamps_status[movement.tool_id]))
                 model.ros_clamps.last_command_success = True
@@ -829,7 +829,7 @@ class MovementJsonPopup(object):
 
         # Entry Box for XYZ
         # self.offset_x = tk.StringVar(value="0")
-        t = tk.Text(self.window, height=200, width = 250)
+        t = tk.Text(self.window, height=200, width=250)
         t.grid(row=1, column=0)
 
         from compas.utilities import DataEncoder
@@ -877,8 +877,8 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
     camera_stream_name = movement.tool_id
     logger_exe.info("Waiting for marker from camera %s" % (movement.tool_id))
 
-
     import roslibpy
+
     def markers_transformation_callback(message_string):
 
         # Print it to UI and keep track of one way latency.
@@ -891,7 +891,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
     for i in range(max_iteration):
         # * Reset list of observed transforamtion
         model.ros_clamps.markers_transformation[camera_stream_name] = []
-        listener = roslibpy.Topic(model.ros_clamps, '/'+ camera_stream_name, 'std_msgs/String')
+        listener = roslibpy.Topic(model.ros_clamps, '/' + camera_stream_name, 'std_msgs/String')
         listener.subscribe(markers_transformation_callback)
 
         # * Store existing offset values
@@ -936,7 +936,8 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
         convergence_XY = 1.0
         convergence_Z = 0.5
         if (correction_amount_XY < convergence_XY and correction_amount_Z < convergence_Z):
-            logger_exe.info("Correction converged below threshold in %i move: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" % (i + 1, correction_amount_XY, convergence_XY, correction_amount_Z, convergence_Z))
+            logger_exe.info("Correction converged below threshold in %i move: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" %
+                            (i + 1, correction_amount_XY, convergence_XY, correction_amount_Z, convergence_Z))
             return True
 
         # * Sanity check
@@ -967,6 +968,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
     logger_exe.warn("AcquireDockingOffset exhausted maxIteration %s without convergence" % max_iteration)
     return False
+
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
@@ -1048,6 +1050,8 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
 #########################################
 # Visual Correction Helper Functions
 #########################################
+
+
 def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement: AcquireDockingOffset, t_camera_from_observedmarker: Transformation, ):
     """Compute the gantry offset from the marker position.
     The movement must have a target_frame.
@@ -1088,7 +1092,7 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
 
     # * Calculation: New Flange Frame in current flange frame
     t_observedmarker_from_newflange = t_flange_from_marker.inverse()
-    t_flange_from_newflange = t_flange_from_camera * t_camera_from_observedmarker * t_observedmarker_from_newflange # type: Transformation
+    t_flange_from_newflange = t_flange_from_camera * t_camera_from_observedmarker * t_observedmarker_from_newflange  # type: Transformation
     v_flange_correction = t_flange_from_newflange.translation_vector
     v_world_flange_correction = v_flange_correction.transformed(t_world_from_currentflange)
 
