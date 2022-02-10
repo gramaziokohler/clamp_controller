@@ -218,19 +218,53 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
             rrc.SetTool(tool_data_name, feedback_level=rrc.FeedbackLevel.DONE)))
         logger_exe.info("Unlocking tool %s (new tooldata = %s)" % (movement.tool_id, tool_data_name))
 
-    # Add some delay after the action
-    future_results.append(model.ros_robot.send(rrc.WaitTime(2, feedback_level=1)))
+    def wait_for_digital_signal(io_name, signal_value_to_wait_for):
+        while (True):
+            future = send_and_wait_unless_cancel(model, rrc.ReadDigital(io_name))
+            # User pressed cancel
+            if not future.done:
+                return False
+            # Check signal, if it is equal to expected value, we return
+            if future.value == signal_value_to_wait_for:
+                return True
+            # If not, we send another read signal and check again
 
     while (True):
+        # * Check for IO completion
         if all([future.done for future in future_results]):
-            return True
+            if movement.digital_output == DigitalOutput.LockTool:
+                # Assert ToolChanger Lock Check signal is HIGH (1)
+                if not wait_for_digital_signal('diUnitR11In3', 1):
+                    logger_exe.warn("UI stop button pressed before getting confirm signal.")
+                    return False
+                else:
+                    logger_exe.info("Toolchanger sensor signal received. DigitalOutput.LockTool is successful")
+                    time.sleep(0.3)
+                    return True
+
+            if movement.digital_output == DigitalOutput.UnlockTool:
+                # Assert ToolChanger Lock Check signal is HIGH (1)
+                if not wait_for_digital_signal('diUnitR11In3', 0):
+                    logger_exe.warn("UI stop button pressed before getting confirm signal.")
+                    return False
+                else:
+                    logger_exe.info("Toolchanger sensor signal received. DigitalOutput.UnlockTool is successful")
+                    time.sleep(0.3)
+                    return True
+
+            else:
+                # Add some delay after the action and assume it is done
+                future = send_and_wait_unless_cancel(model, rrc.WaitTime(2))
+                if not future.done:
+                    logger_exe.warn("UI stop button pressed before WaitTime(2) is over.")
+                    return False
+                else:
+                    return True
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warn(
                 "UI stop button pressed before RoboticDigitalOutput (%s) is completed." % movement)
             return False
         time.sleep(0.05)
-
-    return True
 
 
 def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
