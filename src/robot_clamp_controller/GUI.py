@@ -171,9 +171,9 @@ def create_ui_process(root, q: Queue):
     tree = ttk.Treeview(frame, selectmode='browse')
 
     tree["columns"] = ("movement_id", "description", "details",
-                       "traj_points", "speed_type", "speed", 'beam_id')
+                       "traj_points", "speed_type", "speed", "conf_st", "conf_en", 'beam_id')
     tree["displaycolumns"] = (
-        "movement_id", "description", "details", "traj_points", "speed_type", "speed")
+        "movement_id", "description", "details", "traj_points", "speed_type", "speed", "conf_st", "conf_en")
 
     tree.column("#0", width=150, minwidth=20, stretch=tk.NO)
     tree.column("movement_id", width=100, minwidth=30, stretch=tk.NO)
@@ -182,6 +182,8 @@ def create_ui_process(root, q: Queue):
     tree.column("traj_points", width=100, minwidth=20, stretch=tk.NO)
     tree.column("speed_type", width=100, minwidth=20, stretch=tk.NO)
     tree.column("speed", width=40, minwidth=20, stretch=tk.NO)
+    tree.column("conf_st", width=40, minwidth=20, stretch=tk.NO)
+    tree.column("conf_en", width=40, minwidth=20, stretch=tk.NO)
 
     tree.heading("#0", text="Name", anchor=tk.W)
     tree.heading("movement_id", text="movement_id", anchor=tk.W)
@@ -190,6 +192,8 @@ def create_ui_process(root, q: Queue):
     tree.heading("traj_points", text="TrajectoryPoints", anchor=tk.W)
     tree.heading("speed_type", text="Speed Type", anchor=tk.W)
     tree.heading("speed", text="mm/s", anchor=tk.W)
+    tree.heading("conf_st", text="conf_st", anchor=tk.W)
+    tree.heading("conf_en", text="conf_en", anchor=tk.W)
     tree.heading("beam_id", text="beam_id", anchor=tk.W)
 
     tree.pack(fill=tk.BOTH, expand=1, padx=6, pady=3, side=tk.LEFT)
@@ -485,19 +489,19 @@ def init_actions_tree_view(guiref, model: RobotClampExecutionModel):
             beam_id = process.assembly.sequence[seq_n]
             beam_item = tree.insert(
                 parent="", index="end", iid=beam_id, text="Beam %s" % beam_id, open=True,
-                values=("", "", "", "", "", "", beam_id))
+                values=("", "", "", "-", "", "", "-", "-", beam_id))
             guiref['process']['item_ids'].append(beam_id)
         # Action Row
         description = action.__class__.__name__
         action_item = tree.insert(parent=beam_item, index="end", iid=action.tree_row_id, text="Action %i" % action.act_n,
-                                  values=("", description, "%s" % action, "", "", "", beam_id), open=True)
+                                  values=("", description, "%s" % action, "-", "", "", "-", "-", beam_id), open=True)
         guiref['process']['item_ids'].append(action.tree_row_id)
 
         # Movement Rows
         for j, movement in enumerate(action.movements):
             # Add row and delegate the fill-in to update_treeview_row()
             movement_item = tree.insert(parent=action_item, index="end", iid=movement.tree_row_id, text="Movement %i" % j,
-                                        values=("", "", "", "", "", "", beam_id))
+                                        values=("", "", "", "", "", "", "", "", beam_id))
             update_treeview_row(guiref, model, movement)
             guiref['process']['item_ids'].append(movement.tree_row_id)
 
@@ -538,6 +542,10 @@ def update_treeview_row(guiref, model, movement):
     values[3] = traj_description
     values[4] = movement.speed_type if hasattr(movement, 'speed_type') else ""
     values[5] = model.settings[movement.speed_type] if hasattr(movement, 'speed_type') else ""
+    values[6] = "Yes" if model.process.movement_has_start_robot_config(movement) else ""
+    values[7] = "Yes" if model.process.movement_has_end_robot_config(movement) else ""
+    # values[8] = values[6] # Dont change the beam_id
+
     tree.item(tree_row_id, values=values)
 
 
