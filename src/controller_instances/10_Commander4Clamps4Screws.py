@@ -55,10 +55,10 @@ class SerialCommanderEightTools(SerialCommander):
         self.add_clamp(ClampModel('c2', 'CL3', '2', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c3', 'CL3M', '3', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c4', 'CL3M', '4', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s4', 'SL1_G200', '8', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s4', 'SL1_G200', '8', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
 
         self.ros_client: RosClampCommandListener = None
         self.status_update_interval_low_ms = 950
