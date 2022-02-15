@@ -423,20 +423,34 @@ def check_sync_move(guiref, commander: SerialCommander, target_reach_threshold=0
     - Maybe other checkes will be added in the future.
     This function will request the commander to stop all clamps involved.
     """
+    active_clamp_status_timeout_ms = 2000
+
+    def fail_routine(failed_clamp_id):
+        # Send stop command to all acive clamps, messaging the failed_clamp_id last
+        clamps_to_stop = [c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp]
+        clamps_to_stop.append(failed_clamp_id)
+        for _ in range(5):
+            successes = commander.stop_clamps(clamps_to_stop)
+            if all(successes):
+                break
+        commander.sync_move_inaction = False
+        commander.last_command_success = False
+
     if commander.sync_move_inaction:
         for clamp, target_jaw_position, velo in commander.sync_move_clamp_pos_velo_list:
             # Check every clamp that should be moving
             target_reached = abs(target_jaw_position - clamp.currentJawPosition) < target_reach_threshold
             if clamp.isMotorRunning == False and target_reached == False:
                 logger_sync.warning("Sync Move Check Failed: %s stopped at %0.1fmm before reaching target %0.1fmm. Initializing stop all clamps." % (clamp, clamp.currentJawPosition, target_jaw_position))
-                # Stop all other clamps involved in the sync move
-                successes = [False]
-                for _ in range(5):
-                    if not all(successes):
-                        successes = commander.stop_clamps([c for c, _, _ in commander.sync_move_clamp_pos_velo_list if c is not clamp])
-                commander.sync_move_inaction = False
-                commander.last_command_success = False
+                # Stop all clamps involved in the sync move
+                fail_routine(clamp)
                 return False
+            if current_milli_time() - clamp._state_timestamp > active_clamp_status_timeout_ms:
+                logger_sync.warning("Sync Move Failed: %s lost contact (timeout = %s ms)" % (clamp, active_clamp_status_timeout_ms))
+                # Stop all clamps involved in the sync move
+                fail_routine(clamp)
+                return False
+
         # Cancels the flag if all clamps reached target or stopped.
         if not any([c.isMotorRunning for c, _, _ in commander.sync_move_clamp_pos_velo_list]):
             commander.sync_move_inaction = False
