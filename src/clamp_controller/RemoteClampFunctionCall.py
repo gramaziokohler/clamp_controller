@@ -38,10 +38,13 @@ class RemoteClampFunctionCall(Ros):
         self.sent_messages_ack = {}
         self.trip_times = []
         self.external_status_change_callback = status_change_callback
-        self.clamps_status = {}
-        self.sync_move_inaction = None
         self.last_command_success = None
         self.markers_transformation = {}
+
+        # * Keeps the status update send back fom the Clamp Controller
+        self.last_status_time = 0       # Keep track of the (local) time stamp of last status update
+        self.clamps_status = {}         # Raw Clamp Status sent back from the Clamp Controller
+        self.sync_move_inaction = None  # Flag whether the last sent sync_move command is successful
 
         def clamp_response_callback(message_string):
             receive_time = current_milli_time()
@@ -86,6 +89,7 @@ class RemoteClampFunctionCall(Ros):
             self.clamps_status = data['status']
             self.sync_move_inaction = data['sync_move_inaction']
             self.last_command_success = data['last_command_success']
+            self.last_status_time = time.time()
 
         # Setup listener topic.
         self.listener = roslibpy.Topic(self, '/clamp_status', 'std_msgs/String')
