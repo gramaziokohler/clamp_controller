@@ -12,7 +12,7 @@ from compas_fab.robots.configuration import Configuration
 from compas_fab.backends.ros.messages import ROSmsg
 from integral_timber_joints.process.action import *
 
-from robot_clamp_controller.BackgroundCommand import *
+from robot_clamp_controller.background_command import *
 from robot_clamp_controller.ProcessModel import *
 from robot_clamp_controller.GUI import *
 from robot_clamp_controller.rrc_instructions import *

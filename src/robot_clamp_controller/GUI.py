@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple
 from integral_timber_joints.process.action import *
 from integral_timber_joints.process.movement import *
 
-from robot_clamp_controller.BackgroundCommand import *
+from robot_clamp_controller.background_command import *
 from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel,
                                                  RunStatus)
 

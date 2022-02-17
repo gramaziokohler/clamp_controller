@@ -16,7 +16,7 @@ from compas_fab.backends.ros import RosClient
 from compas_rrc import AbbClient
 from integral_timber_joints.process import *
 from integral_timber_joints.process.movement import *
-from robot_clamp_controller.BackgroundCommand import *
+from robot_clamp_controller.background_command import *
 
 
 from roslibpy import Ros

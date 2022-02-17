@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
 
-from robot_clamp_controller.BackgroundCommand import *
+from robot_clamp_controller.background_command import *
 from robot_clamp_controller.execute_movement import *
 from robot_clamp_controller.GUI import *
 from robot_clamp_controller.ProcessModel import (RobotClampExecutionModel, RunStatus)
