@@ -516,23 +516,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     total_steps = len(movement.trajectory.points)
     last_time = datetime.datetime.now()
 
-    # Check softmove state and send softmove command if state is different.
-    # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
-    if get_softness_enable(guiref):
-        if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
-                                       stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
-            logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause robot_softmove_blocking() failed.")
-            return False
-
-    # Ask user to press play on TP
-    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
-    model.ros_robot.send(rrc.Stop())
-    result = send_and_wait_unless_cancel(model, rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
-    if result.done == False:
-        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
-        return False
-
-    # Clean up command parameters
+    # * Prepare Movement command parameters
     if type(movement) == RoboticClampSyncLinearMovement:
         clamp_ids = movement.clamp_ids
         position = movement.jaw_positions[0]
@@ -541,6 +525,27 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         position = movement.screw_positions[0]
 
     velocity = model.settings[movement.speed_type]
+
+    # * Check softmove state and send softmove command if state is different.
+    # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
+    if get_softness_enable(guiref):
+        if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
+                                       stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
+            logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause robot_softmove_blocking() failed.")
+            return False
+
+    # * Check to ensures Speed Ratio is 100 %
+    if not ensure_speed_ratio(model, model.ros_robot, 100):
+        return False
+
+    # * User Press PLAY to Sart the Movement
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Press PLAY to execute RobClamp Sync Move, CHECK speed is 100pct']))
+    result = send_and_wait_unless_cancel(model, rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
+    if result.done == False:
+        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
+        return False
+
+
 
     # Send movement to Clamp Controller, wait for ROS controller to ACK
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
@@ -1170,6 +1175,31 @@ def check_deviation(model: RobotClampExecutionModel, target_frame: Frame) -> Opt
         return deviation
     else:
         return None
+
+
+def ensure_speed_ratio(model: RobotClampExecutionModel, robot:rrc.AbbClient, target_speed_ratio:float = 100):
+    """Ensures the Speed Ratio of the robot matches the given `target_speed_ratio`.
+    Otherwise, will write to TP to prompt user to change.
+    User press PLAY after changing the ratio.
+
+    Returns True if the user successfully changed the speed ratio to match.
+    Returns False if
+    """
+    while (True):
+        speed_ratio = robot.send_and_wait(GetSpeedRatio(), 2)
+        print("speed_ratio = %s" % (speed_ratio))
+
+        if abs(speed_ratio - target_speed_ratio) < 0.1:
+            return True
+
+        # Print Message to TP and ask for chaning the speed ratio.
+        robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Change Speed Ratio to %i percent. Press PLAY to Continue.' % target_speed_ratio]))
+        robot.send(rrc.Stop())
+        robot.send_and_wait(rrc.WaitTime(0.1))
+        # Allow UI to cancel
+        if model.run_status == RunStatus.STOPPED:
+            return False
+
 
 
 def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: Movement, guiref, point_n: int,
