@@ -15,11 +15,30 @@ from integral_timber_joints.process.action import *
 from robot_clamp_controller.BackgroundCommand import *
 from robot_clamp_controller.ProcessModel import *
 from robot_clamp_controller.GUI import *
+from robot_clamp_controller.rrc_instructions import *
+from robot_clamp_controller.execute_popup import *
 
 from clamp_controller.ScrewdriverModel import g_status_dict
 
 logger_exe = logging.getLogger("app.exe")
 
+"""
+This file contains the procedural routines that is used to execute a movement.
+Different Movement class are handeled by different `execute_` functions.
+Connections to the various drivers are located in `RobotClampExecutionModel`.
+- Calls are made to the Robot Controller via the `AbbClient` from the compas_rrc library. (`model.ros_robot`)
+- Calls to the Remote Tools Controller is via the `RemoteClampFunctionCall` (`model.ros_clamps`)
+- (Both objects are connected via ROS, however other connection objects can also be added if needed)
+
+Many of the `execute_` functions are stoppable from the UI. This is used for any motion that may take a long
+time to accomplish or may fail in an unexpected way. Therefor all functions that implements a waiting loop should
+repeatedly check if `model.run_status == RunStatus.STOPPED`.
+
+The `execute_` functions should return True if the procedure is executed successfully, and false if otherwise.
+In case of execution failure, the `execute_` function is responsible for putting the system in a safe (stopped) state
+before returning.
+
+"""
 # Tool data settings in Robot Studio:
 # TASK PERS tooldata t_A067_Tool:=[TRUE,[[0,0,0],[1,0,0,0]],[2.12,[0,0,45],[1,0,0,0],0,0,0]];
 # TASK PERS tooldata t_A067_Tool_PG1000:=[TRUE,[[0,0,0],[1,0,0,0]],[10.72,[0,0,105],[1,0,0,0],0,0,0]];
@@ -33,10 +52,14 @@ def current_milli_time(): return int(round(time.time() * 1000))
 
 
 def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement):
-    """Return True if the movement is executed to completion without problem.
+    """Executes a Movement.
+    This function is a switch board deligating the actual implementation to one of the
+    `execute_` functions below.
+    This function will return True if the movement is executed to completion without problem.
 
-    This is a blocking call that returns only if a movement is completed
-    or if model.run_status == RunStatus.STOPPED. """
+    This funcion will block until the movement is completed or if it is canceled from the UI.
+    (`model.run_status == RunStatus.STOPPED.`)
+    """
 
     logger_exe.info("Executing %s (%s): %s" % (movement, movement.movement_id, movement.tag))
 
@@ -347,43 +370,6 @@ def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionMode
     return execute_robotic_digital_output_screwdriver(guiref, model, robotic_digital_output_movement)
 
 
-def execute_jog_robot_to_config(guiref, model, config: Configuration, message: str, q):
-    """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
-
-    This functions blocks and waits for the completion. For example if operator did not
-    press Play on the robot contoller, this function will wait for it.
-    Return True if the movement is executed to completion without problem.
-
-    In case user wants to stop the wait, user can press the stop button
-    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
-    will return False.
-    """
-    # Construct and send rrc command
-    model.run_status = RunStatus.JOGGING
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-    ext_values = to_millimeters(config.prismatic_values)
-    joint_values = to_degrees(config.revolute_values)
-
-    # Apply Offsets
-    ext_values = apply_ext_offsets(guiref, ext_values)
-    joint_values = apply_joint_offsets(guiref, joint_values)
-
-    if message != "":
-        model.ros_robot.send(rrc.PrintText(message))
-
-    instruction = rrc.MoveToJoints(joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE)
-    future = send_and_wait_unless_cancel(model, instruction)
-    if future.done:
-        logger_exe.info("execute_jog_robot_to_config complete")
-        model.run_status = RunStatus.STOPPED
-    else:
-        logger_exe.warn("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
-
-    # Trigger update Status
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-    return future.done
-
-
 def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movement: RoboticFreeMovement):
     """Performs RoboticFreeMovement Movement by setting the robot's IO signals
 
@@ -497,15 +483,27 @@ def execute_robotic_linear_movement(guiref, model: RobotClampExecutionModel, mov
 
 
 def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutionModel, movement: RoboticClampSyncLinearMovement):
-    """Performs RoboticFreeMovement Movement by setting the robot's IO signals
+    """Performs RoboticClampSyncLinearMovement Movement
 
+    Syncronization
+    --------------
+    1. User Press Play on TP
+    2. Send movement command to Clamp Controller (wait for message ACK)
+    3. Send movement to Robot Controller (no wait)
+
+
+
+    Execution blocking behaviour
+    ----------------------------
     This functions blocks and waits for the completion. For example if operator did not
     press Play on the robot contoller, this function will wait for it.
     Return True if the movement is executed to completion without problem.
 
+    Cancel
+    ------
     In case user wants to stop the wait, user can press the stop button
     on UI (sets the model.run_status to RunStatus.STOPPED) and this function
-    will return False.
+    will give up, stop robot and clamps, and return False.
     """
 
     STEPS_TO_BUFFER = 1  # Number of steps to allow in the robot buffer
@@ -804,77 +802,45 @@ def execute_remove_operator_offset_movement(guiref, model: RobotClampExecutionMo
     logger_exe.info("Operator offset removed.")
     return True
 
+#####################################################
+# Execute functions that are not based on Movement
+#####################################################
 
-class VisualOffsetPopup(object):
+def execute_jog_robot_to_config(guiref, model, config: Configuration, message: str, q):
+    """Performs RoboticDigitalOutput Movement by setting the robot's IO signals
 
-    def __init__(self, guiref,  model: RobotClampExecutionModel, movement: OperatorAddVisualOffset):
-        self.window = tk.Toplevel(guiref['root'])
-        self.guiref = guiref
-        self.model = model
-        self.movement = movement
-        self.accpet = False
+    This functions blocks and waits for the completion. For example if operator did not
+    press Play on the robot contoller, this function will wait for it.
+    Return True if the movement is executed to completion without problem.
 
-        tk.Label(self.window, text="Offset from the camera target (mm)?").grid(row=0, column=0, columnspan=3)
+    In case user wants to stop the wait, user can press the stop button
+    on UI (sets the model.run_status to RunStatus.STOPPED) and this function
+    will return False.
+    """
+    # Construct and send rrc command
+    model.run_status = RunStatus.JOGGING
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    ext_values = to_millimeters(config.prismatic_values)
+    joint_values = to_degrees(config.revolute_values)
 
-        # Entry Box for XYZ
-        # self.offset_x = tk.StringVar(value="0")
-        tk.Label(self.window, text="X").grid(row=1, column=0, columnspan=3)
-        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_X']).grid(row=1, column=1, columnspan=3)
-        # self.offset_y = tk.StringVar(value="0")
-        tk.Label(self.window, text="Y").grid(row=2, column=0, columnspan=3)
-        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_Y']).grid(row=2, column=1, columnspan=3)
-        # self.offset_z = tk.StringVar(value="0")
-        tk.Label(self.window, text="Z").grid(row=3, column=0, columnspan=3)
-        tk.Entry(self.window, textvariable=self.guiref['offset']['Visual_Z']).grid(row=3, column=1, columnspan=3)
+    # Apply Offsets
+    ext_values = apply_ext_offsets(guiref, ext_values)
+    joint_values = apply_joint_offsets(guiref, joint_values)
 
-        # Buttons
-        tk.Button(self.window, text='Go', command=self.go).grid(row=4, column=0)
-        tk.Button(self.window, text='Accept', command=self.accept).grid(row=4, column=1)
-        tk.Button(self.window, text='Cancel', command=self.cancel).grid(row=4, column=2)
+    if message != "":
+        model.ros_robot.send(rrc.PrintText(message))
 
-        self.value = None
+    instruction = rrc.MoveToJoints(joint_values, ext_values, 1000, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE)
+    future = send_and_wait_unless_cancel(model, instruction)
+    if future.done:
+        logger_exe.info("execute_jog_robot_to_config complete")
+        model.run_status = RunStatus.STOPPED
+    else:
+        logger_exe.warn("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
 
-    def go(self):
-        compute_visual_correction(self.guiref, self.model, self.movement)
-        robot_config = self.movement.end_state['robot'].kinematic_config
-        move_instruction = robot_state_to_instruction(self.guiref, self.model, robot_config, 30, rrc.Zone.FINE)
-        self.model.ros_robot.send(move_instruction)
-
-    def accept(self):
-        compute_visual_correction(self.guiref, self.model, self.movement)
-        self.accpet = True
-        self.window.destroy()
-
-    def cancel(self):
-        self.model.run_status = RunStatus.STOPPED
-        self.accpet = False
-        self.window.destroy()
-
-
-class MovementJsonPopup(object):
-
-    def __init__(self, guiref,  model: RobotClampExecutionModel, movement: Movement):
-        self.window = tk.Toplevel(guiref['root'])
-        self.guiref = guiref
-        self.model = model
-        self.movement = movement
-
-        tk.Label(self.window, text="Offset from the camera target (mm)?").grid(row=0, column=0)
-
-        # Entry Box for XYZ
-        # self.offset_x = tk.StringVar(value="0")
-        t = tk.Text(self.window, height=200, width=250)
-        t.grid(row=1, column=0)
-
-        from compas.utilities import DataEncoder
-        json_data = json.dumps(movement, indent=2, sort_keys=True, cls=DataEncoder)
-        t.insert(tk.END, json_data)
-
-        # Buttons
-        tk.Button(self.window, text='Close', command=self.close).grid(row=2, column=0)
-
-    def close(self):
-        self.window.destroy()
+    # Trigger update Status
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    return future.done
 
 
 def execute_operator_add_visual_offset_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAddVisualOffset):
