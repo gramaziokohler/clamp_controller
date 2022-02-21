@@ -1,6 +1,6 @@
 from robot_clamp_controller.GUI import *
 from robot_clamp_controller.ProcessModel import *
-from robot_clamp_controller.execute import robot_state_to_instruction, compute_visual_correction
+from robot_clamp_controller.execute_helper import *
 
 # from integral_timber_joints.process.movement import *
 
