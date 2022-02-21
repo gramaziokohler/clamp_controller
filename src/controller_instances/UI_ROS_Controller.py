@@ -433,7 +433,7 @@ def check_sync_move(guiref, commander: SerialCommander, target_reach_threshold=0
     - Maybe other checkes will be added in the future.
     This function will request the commander to stop all clamps involved.
     """
-    active_clamp_status_timeout_ms = 2000
+    active_clamp_status_timeout_ms = 3500
 
     def fail_routine(failed_clamp_id):
         # Send stop command to all acive clamps, messaging the failed_clamp_id last
