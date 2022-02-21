@@ -645,13 +645,16 @@ class SettingsPopupWindow(object):
 
 
 class AlternativeStartPointWindow(object):
-    def __init__(self, master, max_number):
+    def __init__(self, master, max_number, current_number = None):
 
         top = self.top = tk.Toplevel(master)
         self.l = tk.Label(top, text="Which point to start from? [0 to %i]" % max_number)
         self.l.pack()
+
         self.e = tk.Entry(top)
         self.e.pack(side=tk.LEFT, fill=tk.BOTH)
+        if current_number is not None:
+            self.e.insert(tk.END, str(current_number))
         self.b = tk.Button(top, text='Go', command=self.cleanup)
         self.b.pack()
         self.value = None

@@ -43,6 +43,7 @@ class RemoteClampFunctionCall(Ros):
 
         # * Keeps the status update send back fom the Clamp Controller
         self.last_status_time = 0       # Keep track of the (local) time stamp of last status update
+        self.clamps_status_count = 0
         self.clamps_status = {}         # Raw Clamp Status sent back from the Clamp Controller
         self.sync_move_inaction = None  # Flag whether the last sent sync_move command is successful
 
@@ -86,6 +87,7 @@ class RemoteClampFunctionCall(Ros):
             if self.external_status_change_callback is not None:
                 self.external_status_change_callback(data)
 
+            self.clamps_status_count += 1
             self.clamps_status = data['status']
             self.sync_move_inaction = data['sync_move_inaction']
             self.last_command_success = data['last_command_success']

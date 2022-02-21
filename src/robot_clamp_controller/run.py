@@ -132,8 +132,6 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
             # Handelling UI_STEP_FROM_POINT
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STEP_FROM_POINT,
                             check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
-                # Change Status
-                model.run_status = RunStatus.STEPPING_FORWARD_FROM_PT
 
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -141,7 +139,11 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 if not hasattr(movement, 'trajectory'):
                     return True
                 max_start_number = len(movement.trajectory.points) - 1
-                popup = AlternativeStartPointWindow(guiref['root'], max_start_number)
+
+                suggest_starting_step = None
+                if hasattr(movement, "last_completed_point"):
+                    suggest_starting_step = movement.last_completed_point
+                popup = AlternativeStartPointWindow(guiref['root'], max_start_number, suggest_starting_step)
                 guiref['root'].wait_window(popup.top)
                 n = popup.value
                 if n is None:
@@ -150,6 +152,8 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_bg.warm("Input number larger than number of trajectory points")
                     return True
 
+                # Change Status
+                model.run_status = RunStatus.STEPPING_FORWARD_FROM_PT
                 model.alternative_start_point = n
                 # Start a new thread if the current one is not active
                 if model.run_thread is None or not model.run_thread.isAlive():
@@ -556,6 +560,7 @@ if __name__ == "__main__":
     # Override default ip
     guiref['ros']['robot_ip_entry'].set(args.robotip)  # VM Address
     guiref['ros']['clamp_ip_entry'].set(args.clampip)  # VM Address
+    guiref['exe']['softmove_enable'].set(1)
 
     if not args.f == "":
         logger_ctr.info(

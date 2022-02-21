@@ -32,6 +32,7 @@ class RunStatus(Enum):
     RUNNING = auto()
     STEPPING_FORWARD = auto()
     STEPPING_FORWARD_FROM_PT = auto()
+    STEPPING_BACKWARD_FROM_PT = auto()
     ERROR = auto()
     STOPPED = auto()
     JOGGING = auto()
