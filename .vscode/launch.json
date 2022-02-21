@@ -59,7 +59,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/robot_clamp_controller/run.py",
             "console": "integratedTerminal",
-            "args": ["-f", "C:\\Users\\leungp\\Documents\\GitHub\\integral_timber_joints\\external\\itj_design_study\\210128_RemodelFredPavilion\\results\\pavilion_process.json"]
+            "args": ["-f", "C:\\Users\\leungp\\Documents\\GitHub\\integral_timber_joints\\external\\itj_design_study\\210419_HyparHut\\results\\Shelter_process.json"]
         }
     ]
 }
