@@ -235,20 +235,24 @@ def _mark_movements_as_softmove(process):
             # Default
             movement.softmove = False
             # Softmove cases
-            if isinstance(movement, RoboticClampSyncLinearMovement) and movement.speed_type == 'speed.assembly.clamping':
+            if isinstance(movement, RoboticClampSyncLinearMovement):
                 movement.softmove = True
-                logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+                logger_model.info("Marked as Soft Move: %s : %s (RoboticClampSyncLinearMovement)" % (movement.movement_id, movement.tag))
+            # Softmove cases
+            if isinstance(movement, RobotScrewdriverSyncLinearMovement):
+                movement.softmove = True
+                logger_model.info("Marked as Soft Move: %s : %s (RobotScrewdriverSyncLinearMovement)" % (movement.movement_id, movement.tag))
 
             #
-            if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
-                movement.softmove = True
-                logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+            # if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
+            #     movement.softmove = True
+            #     logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
 
-            # The linear movement where the tool changer is docking
-            if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
-                if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
-                    movement.softmove = True
-                    logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+            # # The linear movement where the tool changer is docking
+            # if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
+            #     if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
+            #         movement.softmove = True
+            #         logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
 
 
 def _mark_movements_operator_stop(process):
