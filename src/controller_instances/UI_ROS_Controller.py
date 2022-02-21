@@ -282,9 +282,19 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
             if all(result):
                 commander.ros_client.reply_ack_result(this_message.sequence_id, True)
 
+        elif type(msg) == ROS_STOP_ALL_COMMAND:
+            this_message = msg #type: ROS_STOP_ALL_COMMAND
+            if not commander.is_connected:
+                logger_ctr.warning("Connect to Serial Radio first")
+                return True
+            # Get the clamp objects from commander
+            result = commander.stop_all_clamps()
+            commander.ros_client.reply_ack_result(this_message.sequence_id, True)
+
         # * Handelling ROS_SCREWDRIVER_GRIPPER_COMMAND
         elif type(msg) == ROS_SCREWDRIVER_GRIPPER_COMMAND:
             this_message = msg #type: ROS_SCREWDRIVER_GRIPPER_COMMAND # Type Hint Helper
+
             if not commander.is_connected:
                 logger_ctr.warning("Connect to Serial Radio first")
                 send_status_update_to_ros(commander) # Send status back via ROS so that the caller knows nothing moved.
@@ -511,6 +521,10 @@ def ros_command_callback(message, q=None):
     if message_type == "ROS_STOP_COMMAND":
         tools_id = message['instruction_body']
         q.put(ROS_STOP_COMMAND(sequence_id=message['sequence_id'], tools_id=tools_id))
+
+    if message_type == "ROS_STOP_ALL_COMMAND":
+        tools_id = message['instruction_body']
+        q.put(ROS_STOP_ALL_COMMAND(sequence_id=message['sequence_id']))
 
     if message_type == "ROS_GRIPPER_OPEN_COMMAND":
         tool_id = message['instruction_body']

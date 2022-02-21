@@ -47,6 +47,9 @@ class ROS_STOP_COMMAND(ROS_COMMAND):
         super().__init__(sequence_id)
         self.tools_id = tools_id
 
+class ROS_STOP_ALL_COMMAND(ROS_COMMAND):
+    def __init__(self, sequence_id: int):
+        super().__init__(sequence_id)
 class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND):
     def __init__(self, sequence_id: int, tool_id: str, extend: bool):
         super().__init__(sequence_id)
