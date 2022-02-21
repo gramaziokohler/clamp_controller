@@ -31,9 +31,27 @@ def interpolate(start, end, total_steps, current_step):
         raise IndexError("current_step must be within 0 to total_steps")
 
 
+
+def clear_robot_movement_buffers(robot: rrc.AbbClient):
+    print("Flush begin")
+
+    robot.send_and_wait(rrc.SystemSetDigital('do_A067_Interrupt', 1))
+    while (True):
+        result = robot.send_and_wait(rrc.SystemGetDigital('do_A067_InterruptDone'))
+        print ("do_A067_InterruptDone = %s" % result)
+        if result == 1.0:
+            break
+    robot.send(rrc.SetDigital('do_A067_Interrupt', 0))
+    print("Flush complete")
+
+def stop_robot(robot: rrc.AbbClient):
+    robot.send_and_wait(rrc.SystemSetDigital('do_A067_Interrupt', 1))
+    robot.send(rrc.SetDigital('do_A067_Interrupt', 0))
+
+
 if __name__ == '__main__':
 
-    number_of_traj_points = 5
+    number_of_traj_points = 10
 
     ros = RosClient("192.168.0.120")
     ros.run()
@@ -42,6 +60,9 @@ if __name__ == '__main__':
 
     print('Connected.')
     time.sleep(0.5)
+    # robot_11.send_and_wait(rrc.Noop())
+    clear_robot_movement_buffers(robot_11)
+
 
     # # Get joints
     robot_joints, external_axes = robot_11.send_and_wait(rrc.GetJoints())
@@ -63,6 +84,8 @@ if __name__ == '__main__':
     robot_joint_targets = []
     futures = []
 
+
+
     # Send all points
     for current_step in range (0, number_of_traj_points):
         new_traj_point = interpolate(robot_joints, final_joints_value, number_of_traj_points - 1,  current_step)
@@ -71,7 +94,7 @@ if __name__ == '__main__':
 
         # Send robot command
         # rrc.Zone.FINE and feedback_level=rrc.FeedbackLevel.DONE needed to have an accurate feedback timing.
-        future = robot_11.send(rrc.MoveToJoints(new_traj_point, external_axes, 500, rrc.Zone.FINE, feedback_level=rrc.FeedbackLevel.DONE))
+        future = robot_11.send(rrc.MoveToJoints(new_traj_point, external_axes, 500, rrc.Zone.Z0, feedback_level=rrc.FeedbackLevel.DONE))
         futures.append(future)
 
 
@@ -83,18 +106,28 @@ if __name__ == '__main__':
             print ("Future %i is done. Tool %f seconds." % (active_point, (datetime.now() - last_time).total_seconds()))
             last_time = datetime.now()
             active_point += 1
+
         if active_point >= len(futures):
             break
 
+        task_excstate = robot_11.send_and_wait(rrc.GetTaskExecutionState('T_ROB11'))
+        print ("task_excstate = %s" % task_excstate)
+        if task_excstate != "started":
+            print ("task_excstate not = started, Stopping Robot now.")
+            stop_robot(robot_11)
+            break
 
-        # controller_state_send_time = datetime.now()
-        # controller_state = robot_11.send_and_wait(GetControllerState())
-        # print("controller_state = %s, command duration = %s" % (controller_state, (datetime.now() - controller_state_send_time).total_seconds()))
         time.sleep(0.2)
-        task_excstate_future = robot_11.send(rrc.GetTaskExecutionState('T_ROB11'))
-        while(task_excstate_future.done != True):
-            pass
-        print(task_excstate_future.result())
+
+        # If I trigger the stop with code it is very fast reacting
+        # If I trigger the stop with TP Stop button, the robot tend to continue for
+        # two more seconds before stopping.
+        #
+        # if futures[5].done:
+        #     stop_robot(robot_11)
+        #     break
+
+
 
     print("Movement complete")
 

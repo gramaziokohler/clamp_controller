@@ -64,7 +64,7 @@ if __name__ == '__main__':
     logger.info("Sending send_ROS_VEL_GOTO_COMMAND")
     command_sent_time = time.time()
     sequence_id = ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamps_id, 10, 0.8)
-    timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
+    clamp_command_ack_timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
     # Wait for ACK
     while (True):
         if ros_clamps.sent_messages_ack[sequence_id] == True:
@@ -72,8 +72,8 @@ if __name__ == '__main__':
             break
         time_since = time.time() - command_sent_time
         # logger.debug(time_since)
-        if time_since > timeout:
-            logger.info("ACK not received from clamp controller within %s sec" % timeout)
+        if time_since > clamp_command_ack_timeout:
+            logger.info("ACK not received from clamp controller within %s sec" % clamp_command_ack_timeout)
             exit(-1)
         time.sleep(0.02)
 
