@@ -154,6 +154,10 @@ class RemoteClampFunctionCall(Ros):
             instructions.append((clamp_id))
         return self.send_ros_command("ROS_STOP_COMMAND", instructions)
 
+    def send_ROS_STOP_ALL_COMMAND(self):
+        "Stop multiple clamps"
+        return self.send_ros_command("ROS_STOP_ALL_COMMAND","")
+
     def terminate(self):
         self.talker.unadvertise()
         Ros.terminate(self)
