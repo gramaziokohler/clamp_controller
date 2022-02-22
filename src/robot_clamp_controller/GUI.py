@@ -278,6 +278,10 @@ def create_ui_execution(root, q: Queue):
     tk.Label(robot_status_frame, text="Last Movement", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
     tk.Label(robot_status_frame, textvariable=ui_handles['last_executed_movement'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
+    ui_handles['toolchanger_signal'] = tk.StringVar(value=" - ")
+    tk.Label(robot_status_frame, text="Toolchanger signal", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+    tk.Label(robot_status_frame, textvariable=ui_handles['toolchanger_signal'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
+
     ui_handles['last_deviation'] = tk.StringVar(value=" - ")
     tk.Label(robot_status_frame, text="Last Deviation", anchor=tk.W).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
     tk.Label(robot_status_frame, textvariable=ui_handles['last_deviation'], font=tk.big_status_font, anchor=tk.CENTER).pack(side=tk.TOP, fill=tk.BOTH, padx=10)
@@ -315,6 +319,13 @@ def create_ui_execution(root, q: Queue):
         q.put(SimpleNamespace(type=BackgroundCommand.PRINT_ACTION_SUMMARY))
     tk.Button(right_frame, text="Print Selected Beam Action Summary",
               command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
+    def on_shake_gantry_button_click(event=None):
+        logger_ui.info("Button Pressed: Shake Gantry")
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_SHAKE_GANTRY_POPUP))
+    tk.Button(right_frame, text="SHAKE Gantry", command=on_shake_gantry_button_click,
+              font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+
 
     right_frame_2 = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
     right_frame_2.pack(fill=tk.BOTH, expand=1, side=tk.LEFT, padx=6, pady=3)

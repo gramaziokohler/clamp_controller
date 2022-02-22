@@ -13,6 +13,8 @@ class BackgroundCommand(Enum):
     UI_UPDATE_STATUS = auto()
     UI_GOTO_END_FRAME = auto()
     UI_GOTO_START_STATE = auto()
+    UI_SHAKE_GANTRY = auto()
+    UI_SHAKE_GANTRY_POPUP = auto()
     UI_GOTO_END_STATE = auto()
     UI_LOAD_EXT_MOVEMENT = auto()
     UI_OPEN_SETTING = auto()

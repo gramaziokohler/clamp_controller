@@ -49,6 +49,49 @@ class VisualOffsetPopup(object):
         self.accpet = False
         self.window.destroy()
 
+class ShakeGantryPopup(object):
+
+    def __init__(self, guiref,  model: RobotClampExecutionModel, q):
+        self.window = tk.Toplevel(guiref['root'], width=200)
+        self.guiref = guiref
+        self.model = model
+        self.q = q
+
+        tk.Label(self.window, text="Shake robot until ToolChanger Lock").grid(row=0, column=0, columnspan=2)
+
+        # Entry Box for XYZ
+        self.shake_amount = tk.DoubleVar(value=0.5)
+        self.shake_speed = tk.DoubleVar(value=10)
+        self.shake_repeat = tk.IntVar(value=1)
+
+        tk.Label(self.window, text="Shake Amount").grid(row=1, column=0)
+        tk.Scale(self.window, variable=self.shake_amount, from_=0.3, to_=3, orient=tk.HORIZONTAL, resolution=0.1, width=20, length=200).grid(row=1, column=1)
+        tk.Label(self.window, text="Shake Speed mm / s").grid(row=2, column=0)
+        tk.Scale(self.window, variable=self.shake_speed, from_=5, to_=30, orient=tk.HORIZONTAL, resolution=0.1, width=20, length=200).grid(row=2, column=1)
+        tk.Label(self.window, text="Shake Repeat").grid(row=3, column=0)
+        tk.Scale(self.window, variable=self.shake_repeat, from_=1, to_=3, orient=tk.HORIZONTAL, resolution=1, width=20, length=200).grid(row=3, column=1)
+
+        tk.Label(self.window, text="Tool Changer Signal", height=5).grid(row=4, column=0)
+        tk.Label(self.window, textvariable=self.guiref['exe']['toolchanger_signal']).grid(row=4, column=1)
+
+        # Buttons
+        tk.Button(self.window, text='Shake', command=self.shake).grid(row=5, column=0)
+        tk.Button(self.window, text='Cancel', command=self.cancel).grid(row=5, column=1)
+
+        self.value = None
+
+    def shake(self):
+        self.q.put(SimpleNamespace(type=BackgroundCommand.UI_SHAKE_GANTRY, shake_amount=self.shake_amount.get(), shake_speed=self.shake_speed.get(), shake_repeat=self.shake_repeat.get()))
+        pass
+    #     compute_visual_correction(self.guiref, self.model, self.movement)
+    #     compute_visual_correction(self.guiref, self.model, self.movement)
+    #     robot_config = self.movement.end_state['robot'].kinematic_config
+    #     move_instruction = robot_state_to_instruction(self.guiref, self.model, robot_config, 30, rrc.Zone.FINE)
+    #     self.model.ros_robot.send(move_instruction)
+
+    def cancel(self):
+        self.window.destroy()
+
 class MovementJsonPopup(object):
 
     def __init__(self, guiref,  model: RobotClampExecutionModel, movement: Movement):

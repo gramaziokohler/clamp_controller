@@ -256,6 +256,19 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
+            # Handelling UI_SHAKE_GANTRY_POPUP
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SHAKE_GANTRY_POPUP):
+                dialog = ShakeGantryPopup(guiref, model, q)
+
+            # Handelling UI_SHAKE_GANTRY
+            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SHAKE_GANTRY, check_robot_connection=True, check_status_is_stopped=True):
+                shake_amount = msg.shake_amount
+                shake_speed = msg.shake_speed
+                shake_repeat = msg.shake_repeat
+                jog_thread = Thread(target=execute_shake_gantry, args=(guiref, model, shake_amount, shake_speed, shake_repeat, q), daemon=True)
+                jog_thread.name = "Jogging Thread"
+                jog_thread.start()
+
             # Handelling UI_SOFTMODE_ENABLE
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
                 jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref)), daemon=True)

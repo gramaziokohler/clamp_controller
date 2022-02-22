@@ -264,6 +264,7 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
                     return False
                 else:
                     logger_exe.info("Toolchanger sensor signal received. DigitalOutput.LockTool is successful")
+                    guiref['exe']['toolchanger_signal'].set("Locked")
                     time.sleep(0.3)
                     return True
 
@@ -274,6 +275,7 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
                     return False
                 else:
                     logger_exe.info("Toolchanger sensor signal received. DigitalOutput.UnlockTool is successful")
+                    guiref['exe']['toolchanger_signal'].set("Unlocked")
                     time.sleep(0.3)
                     return True
 
@@ -1111,6 +1113,67 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
     logger_exe.warn("AcquireDockingOffset exhausted maxIteration %s without convergence" % max_iteration)
     return False
+
+
+def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, shake_speed, shake_repeat, q):
+
+    model.run_status = RunStatus.JOGGING
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    future = send_and_wait_unless_cancel(model, rrc.GetJoints())
+    if future.done:
+        robot_joints, external_axes = future.value
+        logger_exe.info("execute_shake_gantry begins at robot_joints = %s, external_axes = %s" % (robot_joints, external_axes))
+    else:
+        logger_exe.info("execute_shake_gantry canceled")
+        model.run_status = RunStatus.STOPPED
+        return False
+
+    model.ros_robot.send(rrc.SetAcceleration(100, 100))
+    e_pts = []
+    for a in range(3):
+        for r in range(shake_repeat):
+            # Left
+            e_pts.append(deepcopy(external_axes))
+            e_pts[-1][a] += shake_amount
+            # Right
+            e_pts.append(deepcopy(external_axes))
+            e_pts[-1][a] -= shake_amount
+        # Center
+        e_pts.append(deepcopy(external_axes))
+
+    # Send all points
+    for ext_axes in e_pts:
+        # Send robot command
+        # robot_11.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.FINE))
+        model.ros_robot.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.Z0))
+
+    future = send_and_wait_unless_cancel(model, rrc.MoveToJoints(robot_joints, external_axes, shake_speed, rrc.Zone.FINE))
+    if future.done:
+        logger_exe.info("execute_shake_gantry shaking complete")
+    else:
+        logger_exe.info("execute_shake_gantry shaking canceled")
+        model.run_status = RunStatus.STOPPED
+        return False
+
+    # Check toolchanger signal status
+    future = send_and_wait_unless_cancel(model, rrc.ReadDigital('diUnitR11In3'))
+    # User pressed cancel
+    if not future.done:
+        logger_exe.info("execute_shake_gantry read digital canceled")
+        model.run_status = RunStatus.STOPPED
+        return False
+    else:
+        # Check signal, if it is equal to expected value, we return
+        if future.value == 1:
+            guiref['exe']['toolchanger_signal'].set("Locked")
+        else:
+            guiref['exe']['toolchanger_signal'].set("Unlocked")
+
+
+    model.run_status = RunStatus.STOPPED
+    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+
+    return True
 
 
 def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
