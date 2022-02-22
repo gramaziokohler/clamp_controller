@@ -442,7 +442,16 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
                 break
             # Advance pointer when future is done
             if futures[active_point].done:
+                # Human readable progress counter
+                completed_progress_index = active_point
+                if model.run_status in [RunStatus.RUNNING, RunStatus.STEPPING_FORWARD_FROM_PT, RunStatus.STEPPING_FORWARD]:
+                    completed_progress_index += model.alternative_start_point
+                    movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
+                if model.run_status == RunStatus.STEPPING_BACKWARD_FROM_PT:
+                    completed_progress_index = model.alternative_start_point - completed_progress_index + 1
+                    movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
 
+                # Logging and advance active_point pointer
                 logger_exe.info("Point %i is done. Delta time %f seconds." %
                                 (active_point, (datetime.datetime.now() - last_time).total_seconds()))
                 last_time = datetime.datetime.now()
@@ -663,14 +672,16 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         if active_traj_point_n < len(futures) and futures[active_traj_point_n].done:
             # Human readable progress counter
             completed_progress_index = active_traj_point_n + 1
-            if model.run_status == RunStatus.STEPPING_FORWARD_FROM_PT:
+            if model.run_status in [RunStatus.RUNNING, RunStatus.STEPPING_FORWARD_FROM_PT, RunStatus.STEPPING_FORWARD]:
                 completed_progress_index += model.alternative_start_point
+                movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
             if model.run_status == RunStatus.STEPPING_BACKWARD_FROM_PT:
                 completed_progress_index = model.alternative_start_point - completed_progress_index + 1
+                movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
 
             guiref['exe']['last_completed_trajectory_point'].set(" %i / %i " % (completed_progress_index, total_traj_points))
             logger_exe.info("Robot Traj Point %i / %i completed." % (completed_progress_index, total_traj_points))
-            movement.last_completed_point = active_traj_point_n
+
             active_traj_point_n += 1
 
         # * Monitor if the Clamp Controller send back first status update within timeout
