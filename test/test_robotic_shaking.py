@@ -5,6 +5,13 @@ import time
 from datetime import datetime
 from copy import deepcopy
 
+import logging
+logger = logging.getLogger("test")
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+logger.addHandler(ch)
+
 """
 This test is to see if I can overcome some situation when the robot is stuck trying to locak with the tool changer.
 I can make the robot do some shaking.
@@ -15,6 +22,32 @@ Shake amount can be determined later
 
 """
 
+def send_shake(robot, shake_amount, shake_speed, shake_repeat = 1):
+    robot_joints, external_axes = robot.send_and_wait(rrc.GetJoints())
+    robot_frame = robot.send_and_wait(rrc.GetFrame())
+    logger.info("robot_joints = %s, external_axes = %s" % (robot_joints, external_axes))
+    logger.info("robot_frame = %s" % robot_frame)
+    robot.send(rrc.SetAcceleration(100, 100))
+    e_pts = []
+    for a in range(3):
+        for r in range(shake_repeat):
+            # Left
+            e_pts.append(deepcopy(external_axes))
+            e_pts[-1][a] += shake_amount
+            # Right
+            e_pts.append(deepcopy(external_axes))
+            e_pts[-1][a] -= shake_amount
+        # Center
+        e_pts.append(deepcopy(external_axes))
+
+    # Send all points
+    for ext_axes in e_pts:
+        # Send robot command
+        # robot_11.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.FINE))
+        robot.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.Z0))
+    robot.send_and_wait(rrc.MoveToJoints(robot_joints, external_axes, shake_speed, rrc.Zone.FINE))
+    logger.info("shake complete")
+
 
 if __name__ == '__main__':
 
@@ -23,58 +56,25 @@ if __name__ == '__main__':
     ros = RosClient("192.168.0.120")
     ros.run()
 
-    robot_11 = rrc.AbbClient(ros, '/rob1')
+    robot = rrc.AbbClient(ros, '/rob1')
 
     print('Connected.')
     time.sleep(0.5)
 
-    # # Get joints
-    robot_joints, external_axes = robot_11.send_and_wait(rrc.GetJoints())
-    robot_frame = robot_11.send_and_wait(rrc.GetFrame())
-
-    # # Print received values
-    print("robot_joints = %s, external_axes = %s" % (robot_joints, external_axes))
-    print("robot_frame = %s" % robot_frame)
 
     # ! Generate Shake Trajectory
-    shake_amount = 0.5  # mm
-    shake_speed = 50
-    e_pts = []
+    shake_amount = 1  # mm | min(0.3)
+    shake_speed = 5 #mm/s | min(5 to 50)
+    shake_repeat = 3
 
-    for a in range(3):
-        # Left
-        e_pts.append(deepcopy(external_axes))
-        e_pts[-1][a] += shake_amount
-        # Right
-        e_pts.append(deepcopy(external_axes))
-        e_pts[-1][a] -= shake_amount
-        # Center
-        e_pts.append(deepcopy(external_axes))
+    # robot.send(rrc.CustomInstruction("r_A067_ActSoftMove", string_values=["XYRZ"], float_values=[5, 99]))
 
-    # j = deepcopy(robot_joints)
-    # if j[3] > 0:
-    #     final_joints_value[3] = final_joints_value[3] -100
-    # else:
-    #     final_joints_value[3] = final_joints_value[3] + 100
+    send_shake(robot, shake_amount, shake_speed, shake_repeat)
 
-    # print("final_joints_value = %s" % final_joints_value)
+    # robot.send_and_wait(rrc.CustomInstruction("r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
 
-    # robot_joint_targets = []
-    # futures = []
-
-    robot_11.send(rrc.CustomInstruction("r_A067_ActSoftMove", string_values=["XYRZ"], float_values=[5, 99]))
-    robot_11.send(rrc.SetAcceleration(100, 100))
-    # Send all points
-    for ext_axes in e_pts:
-        # Send robot command
-        # robot_11.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.FINE))
-        robot_11.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.Z0))
-
-    robot_11.send_and_wait(rrc.CustomInstruction("r_A067_DeactSoftMove",  feedback_level=rrc.FeedbackLevel.DONE))
-    robot_11.send(rrc.MoveToJoints(robot_joints, external_axes, shake_speed, rrc.Zone.FINE))
     print("Movement complete")
 
     time.sleep(3)
     ros.terminate()
-    time.sleep(2)
     print('ros terminated')
