@@ -1122,16 +1122,27 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
     """
     model.run_status = RunStatus.JOGGING
     q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+
+    def failure_routine(message):
+        logger_exe.info(message)
+        model.run_status = RunStatus.STOPPED
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+        return False
+
+    # * Enable softmove state.
+    if not robot_softmove_blocking(model, enable=True, soft_direction="XY",
+                                   stiffness=10, stiffness_non_soft_dir=90):
+        return failure_routine("execute_shake_gantry() stopped beacause robot_softmove_blocking() failed.")
+
+    # * Get current joint values
     future = send_and_wait_unless_cancel(model, rrc.GetJoints())
     if future.done:
         robot_joints, external_axes = future.value
         logger_exe.info("execute_shake_gantry begins at robot_joints = %s, external_axes = %s" % (robot_joints, external_axes))
     else:
-        logger_exe.info("execute_shake_gantry canceled")
-        model.run_status = RunStatus.STOPPED
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-        return False
+        return failure_routine("execute_shake_gantry canceled")
 
+    # * Set acceleration to 100% for maximum shakiness
     model.ros_robot.send(rrc.SetAcceleration(100, 100))
     e_pts = []
     for a in range(3):
@@ -1145,7 +1156,9 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
         # Center
         e_pts.append(deepcopy(external_axes))
 
-    # Send all points
+    # * Send all points
+    model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Shake Gantry Begins']))
+
     for ext_axes in e_pts:
         # Send robot command
         # robot_11.send(rrc.MoveToJoints(robot_joints, ext_axes, shake_speed, rrc.Zone.FINE))
@@ -1155,26 +1168,22 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
     if future.done:
         logger_exe.info("execute_shake_gantry shaking complete")
     else:
-        logger_exe.info("execute_shake_gantry shaking canceled")
-        model.run_status = RunStatus.STOPPED
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-        return False
+        return failure_routine("execute_shake_gantry shaking canceled")
 
-    # Check toolchanger signal status
+    # * Check toolchanger signal status
     future = send_and_wait_unless_cancel(model, rrc.ReadDigital('diUnitR11In3'))
-    # User pressed cancel
-    if not future.done:
-        logger_exe.info("execute_shake_gantry read digital canceled")
-        model.run_status = RunStatus.STOPPED
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
-        return False
-    else:
-        # Check signal, if it is equal to expected value, we return
+    if future.done:
+        # * Check signal, if it is equal to expected value, we return
         if future.value == 1:
             guiref['exe']['toolchanger_signal'].set("Locked")
         else:
             guiref['exe']['toolchanger_signal'].set("Unlocked")
+    else:
+        return failure_routine("execute_shake_gantry read digital canceled")
 
+    # * Disable softmove state.
+    if not robot_softmove_blocking(model, enable=False):
+        return failure_routine("execute_shake_gantry() stopped beacause robot_softmove_blocking() failed.")
 
     model.run_status = RunStatus.STOPPED
     q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
