@@ -1116,7 +1116,10 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
 
 def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, shake_speed, shake_repeat, q):
+    """This function is scheduled by the ShakeGantryPopup to create and send the shaking commands.
+    This function is intended to be run in a separate deamon thread.
 
+    """
     model.run_status = RunStatus.JOGGING
     q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
     future = send_and_wait_unless_cancel(model, rrc.GetJoints())
@@ -1126,6 +1129,7 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
     else:
         logger_exe.info("execute_shake_gantry canceled")
         model.run_status = RunStatus.STOPPED
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
         return False
 
     model.ros_robot.send(rrc.SetAcceleration(100, 100))
@@ -1153,6 +1157,7 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
     else:
         logger_exe.info("execute_shake_gantry shaking canceled")
         model.run_status = RunStatus.STOPPED
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
         return False
 
     # Check toolchanger signal status
@@ -1161,6 +1166,7 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
     if not future.done:
         logger_exe.info("execute_shake_gantry read digital canceled")
         model.run_status = RunStatus.STOPPED
+        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
         return False
     else:
         # Check signal, if it is equal to expected value, we return

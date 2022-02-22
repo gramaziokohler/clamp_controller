@@ -90,6 +90,8 @@ class ShakeGantryPopup(object):
     #     self.model.ros_robot.send(move_instruction)
 
     def cancel(self):
+        self.model.run_status = RunStatus.STOPPED
+        self.q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
         self.window.destroy()
 
 class MovementJsonPopup(object):
