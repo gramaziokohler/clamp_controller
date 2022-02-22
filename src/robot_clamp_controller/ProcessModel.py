@@ -72,6 +72,7 @@ class RobotClampExecutionModel(object):
         # Flag to indicate if an movement is active
         self.run_status: RunStatus = RunStatus.STOPPED
         self.run_thread: Thread = None
+        self.alternative_start_point = 0 # Index for Stepping from a specific trajectory point
 
         # Pointer to the currently selected action
         self.current_action: Action = None

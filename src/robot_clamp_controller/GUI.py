@@ -148,20 +148,20 @@ def create_ui_process(root, q: Queue):
         q.put(SimpleNamespace(type=BackgroundCommand.UI_TREEVIEW_GOTO_BEAM, beam_id=beam_id))
 
     ui_handles['goto_beam_value'] = tk.StringVar(value="")
-    goto_beam_combobox = ttk.Combobox(frame, width = 27, textvariable = ui_handles['goto_beam_value'])
+    goto_beam_combobox = ttk.Combobox(frame, width=27, textvariable=ui_handles['goto_beam_value'])
     goto_beam_combobox.pack(side=tk.LEFT, padx=6)
     goto_beam_combobox.bind("<<ComboboxSelected>>", on_goto_beam_combobox_selected)
     ui_handles['goto_beam_combobox'] = goto_beam_combobox
 
     # Test button
     def on_test_button0_click(event=None,):
-        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id = 0))
+        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id=0))
     tk.Button(frame, text="TestButton0",
               command=on_test_button0_click).pack(side=tk.LEFT, padx=6)
 
     # Test button
     def on_test_button1_click(event=None,):
-        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id = 1))
+        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id=1))
     tk.Button(frame, text="TestButton1 - Show JSON",
               command=on_test_button1_click).pack(side=tk.LEFT, padx=6)
 
@@ -226,28 +226,28 @@ def create_ui_execution(root, q: Queue):
         logger_ui.info("Button Pressed: RUN")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_RUN))
     ui_handles['run_button'] = tk.Button(
-        left_frame, text="RUN", command=on_run_button_click, font=tk.big_button_font, width=20, state="disabled")
+        left_frame, text="RUN", command=on_run_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['run_button'].pack(side=tk.TOP)
 
     def on_step_button_click(event=None):
         logger_ui.info("Button Pressed: STEP")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP))
     ui_handles['step_button'] = tk.Button(
-        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=20, state="disabled")
+        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['step_button'].pack(side=tk.TOP)
 
     def on_step_from_point_button_click(event=None):
         logger_ui.info("Button Pressed: STEP FRON POINT")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP_FROM_POINT))
     ui_handles['step_from_pt_button'] = tk.Button(
-        left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=20, state="disabled")
+        left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['step_from_pt_button'].pack(side=tk.TOP)
 
     def on_stop_button_click(event=None):
         logger_ui.info("Button Pressed: STOP")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_STOP))
     ui_handles['stop_button'] = tk.Button(
-        left_frame, text="STOP", command=on_stop_button_click, font=tk.big_button_font, width=20, state="disabled")
+        left_frame, text="STOP", command=on_stop_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['stop_button'].pack(side=tk.TOP)
 
     run_status_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
@@ -298,7 +298,6 @@ def create_ui_execution(root, q: Queue):
     ui_handles['clamps_last_cmd_success_label'] = tk.Label(clamp_status_frame, textvariable=ui_handles['clamps_last_cmd_success'], font=tk.big_status_font, anchor=tk.CENTER)
     ui_handles['clamps_last_cmd_success_label'].pack(side=tk.TOP, fill=tk.BOTH, padx=10)
 
-
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO Start State")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
@@ -327,9 +326,8 @@ def create_ui_execution(root, q: Queue):
     tk.Label(row_frame, text="Softmove Enable", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
     tk.Checkbutton(row_frame, variable=ui_handles['softmove_enable']).pack(side=tk.RIGHT, fill=tk.BOTH)
 
-
     # Soft Direction Dropdown
-    choices = {'Z','XY','XYZ','XYRZ'}
+    choices = {'Z', 'XY', 'XYZ', 'XYRZ'}
     ui_handles['soft_direction'] = tk.StringVar(value="XY")
 
     row_frame = ttk.Frame(right_frame_2)
@@ -343,12 +341,11 @@ def create_ui_execution(root, q: Queue):
     row_frame = ttk.Frame(right_frame_2)
     row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
     tk.Label(row_frame, text="Stiffness Soft Dir", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
-    tk.Entry(row_frame, textvariable=ui_handles['stiffness_soft_dir'], width = 10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
+    tk.Entry(row_frame, textvariable=ui_handles['stiffness_soft_dir'], width=10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
     row_frame = ttk.Frame(right_frame_2)
     row_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=0, pady=3)
     tk.Label(row_frame, text="Stiffness Non-Soft Dir", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=3)
-    tk.Entry(row_frame, textvariable=ui_handles['stiffness_nonsoft_dir'], width = 10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
-
+    tk.Entry(row_frame, textvariable=ui_handles['stiffness_nonsoft_dir'], width=10,  justify=tk.CENTER).pack(side=tk.RIGHT, fill=tk.BOTH)
 
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: Robot Soft Mode")
@@ -364,18 +361,19 @@ def create_ui_execution(root, q: Queue):
 
     return ui_handles
 
+
 def create_ui_offset(root, q: Queue):
     """Creates Lower UI Frame for execution status and controls"""
     ui_handles = {}
 
     # Title and frame
-    title = tk.Label(root, text="Robot Offset")
+    title = tk.Label(root, text="Robot Offset / Setting")
     title.pack(anchor=tk.NW, expand=0, side=tk.TOP, padx=3, pady=3)
 
-    def create_text_field(name, frame):
-        ui_handles[name] = tk.StringVar(value="0")
+    def create_text_field(name, frame, default_value = 0):
+        ui_handles[name] = tk.StringVar(value=str(default_value))
         tk.Label(frame, text=name, anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
-        tk.Entry(frame, textvariable=ui_handles[name], width = 10,  justify=tk.CENTER).pack(side=tk.LEFT, fill=tk.BOTH)
+        tk.Entry(frame, textvariable=ui_handles[name], width=10,  justify=tk.CENTER).pack(side=tk.LEFT, fill=tk.BOTH)
 
     # Correct by flange frame
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
@@ -390,7 +388,15 @@ def create_ui_offset(root, q: Queue):
         logger_ui.info("Button Pressed: Compute Gantry Correction")
         q.put(SimpleNamespace(type=BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION))
     tk.Button(frame, text="Compute Gantry Correction", command=on_compute_visual_alignment_click,
-              font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
+              font=tk.small_button_font, width=25).pack(fill=tk.X, side=tk.LEFT)
+
+    # Acceleration Setting
+
+    tk.Label(frame, text="Acceleration:", anchor=tk.W).pack(side=tk.LEFT, padx=10, pady=1)
+    create_text_field("Free_Acc", frame, 20)
+    create_text_field("Free_Ramp", frame, 20)
+    create_text_field("Linear_Acc", frame, 40)
+    create_text_field("Linear_Ramp", frame, 40)
 
     # Correct by Joint Axis
 
@@ -409,8 +415,6 @@ def create_ui_offset(root, q: Queue):
     create_text_field("Rob_J5", frame)
     create_text_field("Rob_J6", frame)
 
-
-
     return ui_handles
 
 
@@ -421,22 +425,27 @@ def create_ui_offset(root, q: Queue):
 def get_softness_enable(guiref):
     return guiref['exe']['softmove_enable'].get()
 
+
 def get_stiffness_soft_dir(guiref):
     return int(float(guiref['exe']['stiffness_soft_dir'].get()))
+
 
 def get_stiffness_nonsoft_dir(guiref):
     return int(float(guiref['exe']['stiffness_nonsoft_dir'].get()))
 
+
 def get_soft_direction(guiref):
     return guiref['exe']['soft_direction'].get()
+
 
 def get_ext_offsets(guiref):
     offset = [
         float(guiref['offset']['Ext_X'].get()),
         float(guiref['offset']['Ext_Y'].get()),
         float(guiref['offset']['Ext_Z'].get()),
-        ]
+    ]
     return offset
+
 
 def get_joint_offsets(guiref):
     offset = [
@@ -446,11 +455,29 @@ def get_joint_offsets(guiref):
         float(guiref['offset']['Rob_J4'].get()),
         float(guiref['offset']['Rob_J5'].get()),
         float(guiref['offset']['Rob_J6'].get()),
-        ]
+    ]
     return offset
+
+
+def get_free_move_acc_ramp(guiref):
+    offset = [
+        float(guiref['offset']['Free_Acc'].get()),
+        float(guiref['offset']['Free_Ramp'].get()),
+    ]
+    return offset
+
+
+def get_linear_move_acc_ramp(guiref):
+    offset = [
+        float(guiref['offset']['Linear_Acc'].get()),
+        float(guiref['offset']['Linear_Ramp'].get()),
+    ]
+    return offset
+
 
 def apply_ext_offsets(guiref, ext_values):
     return [i+j for i, j in zip(ext_values, get_ext_offsets(guiref))]
+
 
 def apply_joint_offsets(guiref, ext_values):
     return [i+j for i, j in zip(ext_values, get_joint_offsets(guiref))]
@@ -645,7 +672,7 @@ class SettingsPopupWindow(object):
 
 
 class AlternativeStartPointWindow(object):
-    def __init__(self, master, max_number, current_number = None):
+    def __init__(self, master, max_number, current_number=None):
 
         top = self.top = tk.Toplevel(master)
         self.l = tk.Label(top, text="Which point to start from? [0 to %i]" % max_number)
@@ -665,7 +692,7 @@ class AlternativeStartPointWindow(object):
 
 
 if __name__ == "__main__":
-        # Root TK Object
+    # Root TK Object
     root = tk.Tk()
     root.title("Robot and Clamps Assembly Process Execution")
     root.geometry("1500x800")
@@ -675,4 +702,3 @@ if __name__ == "__main__":
 
     # Start the TK GUI Thread
     tk.mainloop()
-

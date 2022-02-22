@@ -325,7 +325,6 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
         logger_exe.error("Screwdriver Movement (%s) not supported for digital_output type: %s" % (movement.movement_id, movement.digital_output))
         return False
 
-
     while (True):
         # Sucess Condition - ACK Received
         if model.ros_clamps.sent_messages_ack[sequence_id] == True:
@@ -338,7 +337,6 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
             model.ros_clamps.send_ROS_STOP_COMMAND([movement.tool_id])
             return False
         time.sleep(0.02)
-
 
     # Wait for next status update
     model.ros_clamps.clamps_status_count = 0
@@ -375,7 +373,7 @@ def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionMode
 
 
 def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movement: RoboticFreeMovement):
-    """Performs RoboticFreeMovement Movement by setting the robot's IO signals
+    """Performs RoboticFreeMovement Movement
 
     This functions blocks and waits for the completion. For example if operator did not
     press Play on the robot contoller, this function will wait for it.
@@ -394,6 +392,16 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         logger_exe.warn("Attempt to execute movement with no trajectory")
         return False
 
+    # Set Acceleration Settings
+    if movement.__class__ == RoboticLinearMovement:
+        acc, ramp = get_linear_move_acc_ramp(guiref)
+    else:
+        acc, ramp = get_free_move_acc_ramp(guiref)
+    result = send_and_wait_unless_cancel(model, rrc.SetAcceleration(acc, ramp))
+    if result.done == False:
+        logger_exe.warn("execute_robotic_*_movement() stopped beacause user canceled while SetAcceleration().")
+        return False
+
     # We store the future results of the movement commands in this list.
     # This allow us to monitor the results and keep a known number of buffer points
     futures = []
@@ -408,7 +416,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     if get_softness_enable(guiref):
         if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
-            logger_exe.warn("execute_robotic_free_movement() stopped beacause robot_softmove_blocking() failed.")
+            logger_exe.warn("execute_robotic_*_movement() stopped beacause robot_softmove_blocking() failed.")
             return False
 
     # In case of a START_FROM_PT
@@ -446,10 +454,10 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
                 completed_progress_index = active_point
                 if model.run_status in [RunStatus.RUNNING, RunStatus.STEPPING_FORWARD_FROM_PT, RunStatus.STEPPING_FORWARD]:
                     completed_progress_index += model.alternative_start_point
-                    movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
+                    movement.last_completed_point = completed_progress_index  # Kept for the Step-from-Point Dialogbox
                 if model.run_status == RunStatus.STEPPING_BACKWARD_FROM_PT:
                     completed_progress_index = model.alternative_start_point - completed_progress_index + 1
-                    movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
+                    movement.last_completed_point = completed_progress_index  # Kept for the Step-from-Point Dialogbox
 
                 # Logging and advance active_point pointer
                 logger_exe.info("Point %i is done. Delta time %f seconds." %
@@ -484,7 +492,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
         guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
     else:
-        logger_exe.warn("execute_robotic_free_movement stopped before deviation result (future not arrived)")
+        logger_exe.warn("execute_robotic_*_movement stopped before deviation result (future not arrived)")
         return False
 
     return True
@@ -554,6 +562,11 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         logger_exe.warn("Attempt to execute movement with no trajectory")
         return False
 
+    # * Set Acceleration Settings to 100% (minimize aceleration phase)
+    result = send_and_wait_unless_cancel(model, rrc.SetAcceleration(100, 100))
+    if result.done == False:
+        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while SetAcceleration().")
+        return False
 
     # * Prepare Movement command parameters
     if type(movement) == RoboticClampSyncLinearMovement:
@@ -602,7 +615,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (clamp_ids, position))
     clamp_command_sent_time = time.time()
     sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
-    clamp_command_ack_timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
+    clamp_command_ack_timeout = 0.5  # ! Timeout for Clamp Controller to ACK command
 
     while (True):
         # Sucess Condition - ACK Received
@@ -613,7 +626,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         # * Fail Condition - Clamp Command not ACKed
         if time_since > clamp_command_ack_timeout:
             logger_exe.warn("RoboticClampSync Movement (%s) stopped because ACK not received from clamp controller within %s sec." %
-                (movement.movement_id, clamp_command_ack_timeout))
+                            (movement.movement_id, clamp_command_ack_timeout))
             stop_clamps()
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Clamp Controller no ACK, cannot continue.']))
             return False
@@ -623,7 +636,6 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             model.ros_clamps.send_ROS_STOP_COMMAND(clamp_ids)
             return False
         time.sleep(0.05)
-
 
     # * Deviation Calculation is not implemented yet (We will need get Joints and do FK here and cmopared with TrajPt)
     guiref['exe']['last_completed_trajectory_point'].set(" - ")
@@ -637,7 +649,6 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     if model.run_status == RunStatus.STEPPING_BACKWARD_FROM_PT:
         starting_traj_point = model.alternative_start_point
 
-
     # * Send all trajectory points to the robot
     logger_exe.info("Sending %i MoveToJoints commands to Robot." % (len(movement.trajectory.points)))
     futures = []
@@ -647,7 +658,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             instruction = trajectory_point_to_instruction(model, movement, guiref, current_step)
             futures.append(model.ros_robot.send(instruction))
     else:
-        for current_step in range(starting_traj_point, -1, -1): # Backwards
+        for current_step in range(starting_traj_point, -1, -1):  # Backwards
             instruction = trajectory_point_to_instruction(model, movement, guiref, current_step)
             futures.append(model.ros_robot.send(instruction))
 
@@ -674,10 +685,10 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             completed_progress_index = active_traj_point_n + 1
             if model.run_status in [RunStatus.RUNNING, RunStatus.STEPPING_FORWARD_FROM_PT, RunStatus.STEPPING_FORWARD]:
                 completed_progress_index += model.alternative_start_point
-                movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
+                movement.last_completed_point = completed_progress_index  # Kept for the Step-from-Point Dialogbox
             if model.run_status == RunStatus.STEPPING_BACKWARD_FROM_PT:
                 completed_progress_index = model.alternative_start_point - completed_progress_index + 1
-                movement.last_completed_point = completed_progress_index # Kept for the Step-from-Point Dialogbox
+                movement.last_completed_point = completed_progress_index  # Kept for the Step-from-Point Dialogbox
 
             guiref['exe']['last_completed_trajectory_point'].set(" %i / %i " % (completed_progress_index, total_traj_points))
             logger_exe.info("Robot Traj Point %i / %i completed." % (completed_progress_index, total_traj_points))
@@ -1241,9 +1252,6 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
     return (new_offset, correction_amount_XY, correction_amount_Z)
 
 
-
-
-
 #########################
 # rrc Helper Functions
 #########################
@@ -1303,5 +1311,3 @@ def ensure_speed_ratio(model: RobotClampExecutionModel, robot: rrc.AbbClient, ta
         # Allow UI to cancel
         if model.run_status == RunStatus.STOPPED:
             return False
-
-

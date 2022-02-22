@@ -109,6 +109,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                             check_loaded_process=True, check_robot_connection=True):
                 # Change Status
                 model.run_status = RunStatus.RUNNING
+                model.alternative_start_point = 0
                 # Start a new thread if the current one is not active
                 if model.run_thread is None or not model.run_thread.isAlive():
                     model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
@@ -122,6 +123,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                             check_loaded_process=True, check_robot_connection=True):
                 # Change Status
                 model.run_status = RunStatus.STEPPING_FORWARD
+                model.alternative_start_point = 0
                 # Start a new thread if the current one is not active
                 if model.run_thread is None or not model.run_thread.isAlive():
                     model.run_thread = Thread(target=program_run_thread, args=(guiref, model, q), daemon=True)
