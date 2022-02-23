@@ -20,6 +20,7 @@ from robot_clamp_controller.execute_helper import *
 from robot_clamp_controller.execute_popup import *
 
 from clamp_controller.ScrewdriverModel import g_status_dict
+from clamp_controller.CommanderGUI import ROS_VEL_GOTO_COMMAND
 
 logger_exe = logging.getLogger("app.exe")
 
@@ -329,7 +330,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
 
     while (True):
         # Sucess Condition - ACK Received
-        if model.ros_clamps.sent_messages_ack[sequence_id] == True:
+        if model.ros_clamps.sent_messages[sequence_id] == True:
             logger_exe.info("ROS_GRIPPER command ACK received.")
             break
 
@@ -580,6 +581,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     velocity = model.settings[movement.speed_type]
 
+
     # * Check softmove state and send softmove command if state is different.
     # - the movement.softmove properity was marked by _mark_movements_as_softmove() when process is loaded.
     if get_softness_enable(guiref):
@@ -613,15 +615,28 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
         return False
 
+    # * Retrive screwdriver motion parameters
+    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id in clamp_ids]
+    if movement.speed_type == "speed.assembly.screw_assemble":
+        power_percentage = 90
+    elif movement.speed_type == "speed.assembly.screw_retract":
+        power_percentage = 95
+    elif movement.speed_type == "speed.assembly.screw_tighten":
+        power_percentage = 80
+    else:
+        power_percentage = 99
+    allowable_target_deviation = movement.allowable_target_deviation
+
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
     logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (clamp_ids, position))
     clamp_command_sent_time = time.time()
-    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
+    command = ROS_VEL_GOTO_COMMAND(None, clamps_pos_velo, power_percentage, allowable_target_deviation)
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(command)
     clamp_command_ack_timeout = 0.5  # ! Timeout for Clamp Controller to ACK command
 
     while (True):
         # Sucess Condition - ACK Received
-        if model.ros_clamps.sent_messages_ack[sequence_id] == True:
+        if model.ros_clamps.sent_messages[sequence_id] == True:
             logger_exe.info("send_ROS_VEL_GOTO_COMMAND ACK received.")
             break
         time_since = time.time() - clamp_command_sent_time
@@ -773,15 +788,29 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
 
     # Remove clamp prefix:
     clamp_ids = movement.clamp_ids
+    positions = movement.jaw_positions
     velocity = model.settings[movement.speed_type]
-    position = movement.jaw_positions[0]
+
+    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id, position in zip(clamp_ids, positions)]
+    if movement.speed_type == "speed.assembly.screw_assemble":
+        power_percentage = 90
+    elif movement.speed_type == "speed.assembly.screw_retract":
+        power_percentage = 95
+    elif movement.speed_type == "speed.assembly.screw_tighten":
+        power_percentage = 80
+    else:
+        power_percentage = 99
+    allowable_target_deviation = movement.allowable_target_deviation
+
+
+    command = ROS_VEL_GOTO_COMMAND(None, clamps_pos_velo, power_percentage, allowable_target_deviation)
     model.ros_clamps.last_command_success = None
-    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamp_ids, position, velocity)
+    sequence_id = model.ros_clamps.send_ROS_VEL_GOTO_COMMAND(command)
 
     # Wait for Clamp Controller to ACK
     while (True):
-        if model.ros_clamps.sent_messages_ack[sequence_id] == True:
-            logger_exe.info("Clamp Jaw Movement (%s) with %s to %smm Started" % (movement.movement_id, clamp_ids, position))
+        if model.ros_clamps.sent_messages[sequence_id] == True:
+            logger_exe.info("Clamp Jaw Movement (%s) with %s Started" % (movement.movement_id, clamp_ids))
             break
         # # Check if the the reply is negative
         # if model.ros_clamps.sync_move_inaction == False:

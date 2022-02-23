@@ -38,9 +38,37 @@ class ROS_COMMAND(object):
         self.sequence_id = sequence_id
 
 class ROS_VEL_GOTO_COMMAND(ROS_COMMAND):
-    def __init__(self, sequence_id: int, clamps_pos_velo: List[Tuple[str, float, float]]):
+    def __init__(self, sequence_id: int = None, clamps_pos_velo: List[Tuple[str, float, float]] = [], power_percentage=100, allowable_target_deviation=0):
         super().__init__(sequence_id)
         self.clamps_pos_velo = clamps_pos_velo
+        self.power_percentage = power_percentage
+        self.allowable_target_deviation = allowable_target_deviation
+
+    def to_data(self):
+        return self.data
+
+    @classmethod
+    def from_data(cls, data):
+        command = cls()
+        command.data = data
+        return command
+
+    @property
+    def data(self):
+        data = {
+            'sequence_id': self.sequence_id,
+            'clamps_pos_velo': self.clamps_pos_velo,
+            'power_percentage': self.power_percentage,
+            'allowable_target_deviation': self.allowable_target_deviation,
+        }
+        return data
+
+    @data.setter
+    def data(self, data):
+        self.sequence_id = data.get('sequence_id', None)
+        self.clamps_pos_velo = data.get('clamps_pos_velo', [])
+        self.power_percentage = data.get('power_percentage', 100)
+        self.allowable_target_deviation = data.get('allowable_target_deviation', 0)
 
 class ROS_STOP_COMMAND(ROS_COMMAND):
     def __init__(self, sequence_id: int, tools_id: List[str]):

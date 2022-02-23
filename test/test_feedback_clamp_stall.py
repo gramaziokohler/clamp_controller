@@ -4,6 +4,8 @@ from compas_fab.backends.ros import RosClient
 import time
 from datetime import datetime
 from clamp_controller.RemoteClampFunctionCall import RemoteClampFunctionCall
+from clamp_controller.CommanderGUI import ROS_VEL_GOTO_COMMAND
+
 import logging
 
 
@@ -49,7 +51,7 @@ if __name__ == '__main__':
 
     ip = "192.168.0.120"
     ros_clamps = RemoteClampFunctionCall(ip)
-    clamps_id = ['s1', 's3', 's4']
+    clamps_id = ['s1']
     try:
         # This runs in a separate thread
         ros_clamps.run(timeout=2)
@@ -63,11 +65,17 @@ if __name__ == '__main__':
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
     logger.info("Sending send_ROS_VEL_GOTO_COMMAND")
     command_sent_time = time.time()
-    sequence_id = ros_clamps.send_ROS_VEL_GOTO_COMMAND(clamps_id, 10, 0.8)
+    velocity = 0.8
+    position = 10
+    power_percentage=80
+    allowable_target_deviation=5
+    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id in clamps_id]
+    command = ROS_VEL_GOTO_COMMAND(None, clamps_pos_velo, power_percentage, allowable_target_deviation)
+    sequence_id = ros_clamps.send_ROS_VEL_GOTO_COMMAND(command)
     clamp_command_ack_timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
     # Wait for ACK
     while (True):
-        if ros_clamps.sent_messages_ack[sequence_id] == True:
+        if ros_clamps.sent_messages[sequence_id] == True:
             logger.info("send_ROS_VEL_GOTO_COMMAND ACK received.")
             break
         time_since = time.time() - command_sent_time

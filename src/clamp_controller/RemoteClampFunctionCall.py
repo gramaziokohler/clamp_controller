@@ -5,9 +5,9 @@
 #   hostip = '192.168.43.141'
 #   clamps_connection = RemoteClampFunctionCall(hostip)
 # Command to send clamp to target (non-blocking)
-#   clamps_connection.send_ROS_VEL_GOTO_COMMAND(100.0, 1.0)
+#   clamps_connection.send_ROS_VEL_GOTO_COMMAND(ROS_VEL_GOTO_COMMAND)
 # Command to send clamp to target (blocking)
-#   success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(100.0, 1.0, 1000)
+#   success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(ROS_VEL_GOTO_COMMAND, 1000)
 # Command to stop clamps (non-blocking)
 #   clamps_connection.send_ROS_STOP_COMMAND(['1','2'])
 
@@ -20,6 +20,8 @@ import time
 import datetime
 import json
 import roslibpy
+
+from clamp_controller.CommanderGUI import ROS_VEL_GOTO_COMMAND
 def current_milli_time(): return int(round(time.time() * 1000))
 
 
@@ -35,7 +37,7 @@ class RemoteClampFunctionCall(Ros):
         # Communication control
         self.sequence_id = -1
 
-        self.sent_messages_ack = {}
+        self.sent_messages = {}
         self.trip_times = []
         self.external_status_change_callback = status_change_callback
         self.last_command_success = None
@@ -52,7 +54,7 @@ class RemoteClampFunctionCall(Ros):
             # Retrive the sent message and compare time
             feedback_message = json.loads(message_string['data'])
             sequence_id = feedback_message['sequence_id']
-            org_message = self.sent_messages_ack[sequence_id]
+            org_message = self.sent_messages[sequence_id]
             org_message['received'] = True
             send_time = int(org_message['timestamp'])
             bounce_time = int(feedback_message['timestamp'])
@@ -67,7 +69,7 @@ class RemoteClampFunctionCall(Ros):
 
             if 'ack' in feedback_message:
                 ack_success = int(feedback_message['ack'])
-                self.sent_messages_ack[sequence_id] = ack_success
+                self.sent_messages[sequence_id] = ack_success
                 print('Received Message: ack received = %s' % ack_success)
 
         # Setup talker to send message
@@ -108,25 +110,28 @@ class RemoteClampFunctionCall(Ros):
         # Create message to send
         message = {}
         message['sequence_id'] = self.sequence_id
+        if isinstance(instruction_body, dict):
+            instruction_body['sequence_id'] = self.sequence_id # Temp fix for ROS_VEL_GOTO_COMMAND
         message['timestamp'] = current_milli_time()
         message['instruction_type'] = instruction_type
         message['instruction_body'] = instruction_body
+
         self.talker.publish(roslibpy.Message({'data': json.dumps(message)}))
         # Keep track of sent message
         message['received'] = False  # Keep track of ACK.
-        self.sent_messages_ack[self.sequence_id] = message
+        self.sent_messages[self.sequence_id] = message
         self.sequence_id += 1
         print("Sent Message to clamp_command:", message)
         return self.sequence_id - 1
 
     # Return true if sending is successful. False if timeout
-    def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id, position, velocity, timeout_ms=1000):
+    def send_ROS_VEL_GOTO_COMMAND_wait(self, command:ROS_VEL_GOTO_COMMAND, timeout_ms:float=1000):
         """clamps_id: str, position: float, velocity: float, timeout_ms: int = 1000) -> bool:
         """
         start_time = current_milli_time()
-        sequence_id = self.send_ROS_VEL_GOTO_COMMAND(clamps_id, position, velocity)
+        sequence_id = self.send_ROS_VEL_GOTO_COMMAND(command)
         while (current_milli_time() - start_time < timeout_ms):
-            if self.sent_messages_ack[sequence_id] == True:
+            if self.sent_messages[sequence_id] == True:
                 return True
 
         return False
@@ -141,12 +146,10 @@ class RemoteClampFunctionCall(Ros):
         return self.send_ros_command("ROS_GRIPPER_CLOSE_COMMAND", screwdriver_id)
 
     # Returns the sequence_id of sent message
-    def send_ROS_VEL_GOTO_COMMAND(self, clamps_id: List[str], position: float, velocity: float):
+    def send_ROS_VEL_GOTO_COMMAND(self, command:ROS_VEL_GOTO_COMMAND):
         """Move multiple clamps to the same position using same velocity"""
-        instructions = []
-        for clamp_id in clamps_id:
-            instructions.append((clamp_id, position, velocity))
-        return self.send_ros_command("ROS_VEL_GOTO_COMMAND", instructions)
+        instruction_body = command.data
+        return self.send_ros_command("ROS_VEL_GOTO_COMMAND", instruction_body)
 
     # Returns the sequence_id of sent message
     def send_ROS_STOP_COMMAND(self, clamps_id: List[str]):
@@ -172,10 +175,10 @@ if __name__ == "__main__":
     clamps_connection = RemoteClampFunctionCall(hostip)
     clamps_connection.run()
     # Command to send clamp to target (non-blocking)
-    # clamps_connection.send_ROS_VEL_GOTO_COMMAND(100.0, 1.0)
+    # clamps_connection.send_ROS_VEL_GOTO_COMMAND(ROS_VEL_GOTO_COMMAND)
 
     # Command to send clamp to target (blocking)
-    # success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(100.0, 1.0, 1000)
+    # success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(ROS_VEL_GOTO_COMMAND, 1000)
 
     while clamps_connection.is_connected:
         i = input("Type a position (95-220) , velocity  (0.1 - 3.0) (to Send a test Message topic=/clamp_command , x to quit.\n")
@@ -197,7 +200,8 @@ if __name__ == "__main__":
             except:
                 print("Bad Input, position range (95-220). Try again:\n")
                 continue
-            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['3'], position, velocity)
+            command = ROS_VEL_GOTO_COMMAND(None, [('s1', position, velocity)], 80, 2)
+            success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(command)
             if success:
                 print("send_ROS_VEL_GOTO_COMMAND_wait() Message Success (Clamp Ack)")
             else:

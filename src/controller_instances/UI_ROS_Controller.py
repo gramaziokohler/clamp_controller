@@ -150,6 +150,11 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
+                # If a sync move is running, stop that and send status back over ros
+                if commander.sync_move_inaction:
+                    commander.sync_move_inaction = False
+                    commander.last_command_success = False
+                    send_status_update_to_ros(commander)
                 # Instruct commander to send command
                 all_clamps = commander.clamps.values()
                 selected_clamps = get_checkbox_selected_clamps(guiref, commander)
@@ -235,6 +240,10 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
         # * Handelling ROS_VEL_GOTO_COMMAND
         if type(msg) == ROS_VEL_GOTO_COMMAND:
             this_message = msg #type: ROS_VEL_GOTO_COMMAND # Type Hint Helper
+            # Keep track if the command is completed successful.
+            # This will be set back to true by the sync watcher
+            commander.last_command_success = False
+
             if not commander.is_connected:
                 logger_ctr.warning("Connect to Serial Radio first")
                 send_status_update_to_ros(commander) # Send status back via ROS so that the caller knows nothing moved.
@@ -247,14 +256,24 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
                 send_status_update_to_ros(commander) # Send status back via ROS so that the caller knows nothing moved.
                 return True
 
-            # Keep track if the command is completed successful.
-            # This will be set back to true by the sync watcher
-            commander.last_command_success = False
+            # Set Power
+            if this_message.power_percentage is not None:
+                power = this_message.power_percentage
+                clamps_to_communicate = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id, position, velocity in clamps_pos_velo]
+                successes = commander.set_clamps_power(clamps_to_communicate, power)
+                logger_ctr.info("Sending Power command (%s) to %s, successes = %s" % (power, clamps_to_communicate, successes))
+                if not all(successes):
+                    logger_ctr.warning("ROS_VEL_GOTO_COMMAND send power setting failed.")
+                    send_status_update_to_ros(commander) # Send status back via ROS so that the caller knows nothing moved.
+                    return True
+                else:
+                    commander.ros_client.reply_ack_result(this_message.sequence_id, True)
+
+            # Set allowable_target_deviation state for later monitoring
+            commander.allowable_target_deviation = this_message.allowable_target_deviation
 
             # Replace the process_tool_id with the retrived ClampModel
             clamp_pos_velo_list = [(commander.get_clamp_by_process_tool_id(tool_id), position, velocity) for tool_id, position, velocity in clamps_pos_velo]
-
-            # Instruct commander to send command
             success = commander.sync_clamps_move(clamp_pos_velo_list)
 
             if success:
@@ -515,8 +534,7 @@ def ros_command_callback(message, q=None):
 
     logger_ros.info("Ros Message Received: %s" % message)
     if message_type == "ROS_VEL_GOTO_COMMAND":
-        instruction = message['instruction_body']
-        q.put(ROS_VEL_GOTO_COMMAND(sequence_id=message['sequence_id'], clamps_pos_velo=instruction))
+        q.put(ROS_VEL_GOTO_COMMAND.from_data(message['instruction_body']))
 
     if message_type == "ROS_STOP_COMMAND":
         tools_id = message['instruction_body']
