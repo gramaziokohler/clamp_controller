@@ -368,7 +368,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
             return False
 
 
-def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionModel, movement: RoboticDigitalOutput):
+def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAttachToolMovement):
     robotic_digital_output_movement = RoboticDigitalOutput(DigitalOutput.CloseGripper, movement.tool_id, tag=movement.tag)
     robotic_digital_output_movement.movement_id = movement.movement_id
     return execute_robotic_digital_output_screwdriver(guiref, model, robotic_digital_output_movement)
