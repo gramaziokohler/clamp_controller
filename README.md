@@ -118,11 +118,12 @@ Example code:
    clamps_connection = RemoteClampFunctionCall(hostip)
 
 # Command to send clamp to target (non-blocking)
-   clamps_connection.send_ROS_VEL_GOTO_COMMAND(ROS_VEL_GOTO_COMMAND)
+   clamps_connection.sendD(ROS_VEL_GOTO_COMMAND)
 # Command to send clamp to target (blocking)
-   success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(ROS_VEL_GOTO_COMMAND, 1000)
+   success = clamps_connection.send_and_wait(ROS_VEL_GOTO_COMMAND, 1000)
 # Command to stop clamps (non-blocking)
-   clamps_connection.send_ROS_STOP_COMMAND(['1','2'])
+self.
+   clamps_connection.send(ROS_STOP_COMMAND(['1','2']))
 ```
 
 Read the [RemoteClampFunctionCall.py](src\clamp_controller\RemoteClampFunctionCall.py) for available functions.

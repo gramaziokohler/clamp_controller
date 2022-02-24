@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel
 from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gui
-from clamp_controller.SerialCommander import SerialCommander
+from clamp_controller.SerialCommander import RosSerialCommander
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
 
 from controller_instances.UI_ROS_Controller import initialize_logging, background_thread
@@ -36,10 +36,10 @@ last_status_update_time = 0
 # * Model Object
 
 
-class SerialCommanderEightTools(SerialCommander):
+class SerialCommanderEightTools(RosSerialCommander):
 
     def __init__(self):
-        SerialCommander.__init__(self)
+        RosSerialCommander.__init__(self)
 
         # * Clamp Calculation
         # 918 step/mm is derived from

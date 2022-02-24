@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel
+from clamp_controller.RosCommand import *
 from serial.tools import list_ports
 
 logger_ui = logging.getLogger("app.UI")
@@ -28,65 +29,7 @@ class BackgroundCommand(Enum):
     CMD_SCREWDRIVER_GOTO = 15
     CMD_SCREWDRIVER_VELO = 16
     CMD_SCREWDRIVER_GRIPPER = 17
-    # Commands coming from ROS
-    # ROS_VEL_GOTO_COMMAND = ROS_VEL_GOTO_COMMAND
-    # ROS_STOP_COMMAND = ROS_STOP_COMMAND
-    # ROS_SCREWDRIVER_GRIPPER_COMMAND = ROS_SCREWDRIVER_GRIPPER_COMMAND
 
-class ROS_COMMAND(object):
-    def __init__(self, sequence_id: int):
-        self.sequence_id = sequence_id
-
-class ROS_VEL_GOTO_COMMAND(ROS_COMMAND):
-    def __init__(self, sequence_id: int = None, clamps_pos_velo: List[Tuple[str, float, float]] = [], power_percentage=100, allowable_target_deviation=0):
-        super().__init__(sequence_id)
-        self.clamps_pos_velo = clamps_pos_velo
-        self.power_percentage = power_percentage
-        self.allowable_target_deviation = allowable_target_deviation
-
-    def to_data(self):
-        return self.data
-
-    @classmethod
-    def from_data(cls, data):
-        command = cls()
-        command.data = data
-        return command
-
-    @property
-    def data(self):
-        data = {
-            'sequence_id': self.sequence_id,
-            'clamps_pos_velo': self.clamps_pos_velo,
-            'power_percentage': self.power_percentage,
-            'allowable_target_deviation': self.allowable_target_deviation,
-        }
-        return data
-
-    @data.setter
-    def data(self, data):
-        self.sequence_id = data.get('sequence_id', None)
-        self.clamps_pos_velo = data.get('clamps_pos_velo', [])
-        self.power_percentage = data.get('power_percentage', 100)
-        self.allowable_target_deviation = data.get('allowable_target_deviation', 0)
-
-class ROS_STOP_COMMAND(ROS_COMMAND):
-    def __init__(self, sequence_id: int, tools_id: List[str]):
-        super().__init__(sequence_id)
-        self.tools_id = tools_id
-
-class ROS_STOP_ALL_COMMAND(ROS_COMMAND):
-    def __init__(self, sequence_id: int):
-        super().__init__(sequence_id)
-class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND):
-    def __init__(self, sequence_id: int, tool_id: str, extend: bool):
-        super().__init__(sequence_id)
-        self.tool_id = tool_id
-        self.extend = extend
-
-class ROS_REQUEST_STATUSUPDATE(ROS_COMMAND):
-    def __init__(self, sequence_id: int):
-        super().__init__(sequence_id)
 
 def create_commander_gui(root, q: Queue, clamps):
     tk.font_key = tkFont.Font(family="Lucida Grande", size=10)

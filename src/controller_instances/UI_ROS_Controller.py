@@ -14,14 +14,14 @@ from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel, g_status_dict
 from clamp_controller.CommanderGUI import *
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
-from clamp_controller.SerialCommander import SerialCommander
+from clamp_controller.SerialCommander import RosSerialCommander
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
 # This UI implemented a Model-View-Controller pattern.
 
-# Model is a single SerialCommander() object
+# Model is a single ROSSerialCommander() object
 # View is the TKInter UI that is created by CommanderGUI.create_commander_gui()
 # Controller for the UI is the tk.mainloop().
 # Controller for background task is the background_thread() that runs on a separate thread.
@@ -37,7 +37,7 @@ logger_sync = logging.getLogger("app.sync")
 last_status_update_time = 0
 
 
-def background_thread(guiref, commander: SerialCommander, q):
+def background_thread(guiref, commander: RosSerialCommander, q):
     # This is a sudo time-split multi-task with priority execution.
     # Tasks higher up in the list have higher priority.
     # Task must return True if it was executed and return False if it was not executed.
@@ -54,7 +54,7 @@ def background_thread(guiref, commander: SerialCommander, q):
     logging.getLogger("app.bg").info("Background Thread Stopped")
 
 
-def get_checkbox_selected_clamps(guiref, commander: SerialCommander) -> List[ClampModel]:
+def get_checkbox_selected_clamps(guiref, commander: RosSerialCommander) -> List[ClampModel]:
     # Determine if the clamps are selected
     clamps_selected = []
     for clamp in commander.clamps.values():
@@ -63,7 +63,7 @@ def get_checkbox_selected_clamps(guiref, commander: SerialCommander) -> List[Cla
     return clamps_selected
 
 
-def handle_background_commands(guiref, commander: SerialCommander, q):
+def handle_background_commands(guiref, commander: RosSerialCommander, q):
     """Try to pop a command from the command q.
     Returns True if a message is popped regardless if it is processed or not."""
 
@@ -363,7 +363,7 @@ def handle_background_commands(guiref, commander: SerialCommander, q):
         return False
 
 
-def update_status(guiref, commander: SerialCommander):
+def update_status(guiref, commander: RosSerialCommander):
     """Regularly calling the commander to poll clamps for a status.
     Updates the GUI labels upon a successful poll. ALso updates the last communicated time if unsuccessful.
     """
@@ -444,7 +444,7 @@ def update_status(guiref, commander: SerialCommander):
         return False
 
 
-def check_sync_move(guiref, commander: SerialCommander, target_reach_threshold=0.5):
+def check_sync_move(guiref, commander: RosSerialCommander, target_reach_threshold=0.5):
     """ Perhaps a checks if the commander.sync_move_inaction flag is True.
     This function checks all the clamps in commander.sync_move_clamp_pos_velo_list
     The following check is performed:
@@ -492,17 +492,17 @@ def check_sync_move(guiref, commander: SerialCommander, target_reach_threshold=0
         return False
 
 
-def send_status_update_to_ros(commander: SerialCommander):
+def send_status_update_to_ros(commander: RosSerialCommander):
     if commander.ros_client is not None:
 
         status = {}
         for tool in commander.clamps.values():
             status[tool.process_tool_id] = tool.state_to_data
-        data = {}
-        data['status'] = status
-        data['last_command_success'] = commander.last_command_success
-        data['sync_move_inaction'] = commander.sync_move_inaction
-        commander.ros_client.send_status(data)
+        status_dict = {}
+        status_dict['clamps_status'] = status
+        status_dict['last_command_success'] = commander.last_command_success
+        status_dict['sync_move_inaction'] = commander.sync_move_inaction
+        commander.ros_client.send_status_dict(status_dict)
 
 
 def initialize_logging(filename: str):
@@ -568,7 +568,7 @@ if __name__ == "__main__":
     # Command queue
     q = queue.Queue()
     # Create Model
-    commander = SerialCommander()
+    commander = RosSerialCommander()
     # Get GUI Reference
     guiref = create_commander_gui(root, q, commander.clamps.values())
 

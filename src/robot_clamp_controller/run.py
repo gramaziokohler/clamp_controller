@@ -176,7 +176,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                         model.run_thread = None
                     # Just to be safe. Issue Stop Clamps if they are connected
                     if model.ros_clamps is not None:
-                        model.ros_clamps.send_ROS_STOP_ALL_COMMAND()
+                        model.ros_clamps.send(ROS_STOP_ALL_COMMAND())
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_CONFIRM

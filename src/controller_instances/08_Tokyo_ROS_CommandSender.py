@@ -38,8 +38,3 @@ while (True):
     i = input(" Next Command (3): %s\nPress Enter to continue:" % instructions)
     clamps_connection.send_ros_command("ROS_VEL_GOTO_COMMAND",instructions)
 
-
-# Command to send clamp to target (blocking)
-#   success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(100.0, 1.0, 1000)
-# Command to stop clamps (non-blocking)
-#   clamps_connection.send_ROS_STOP_COMMAND(['1','2'])

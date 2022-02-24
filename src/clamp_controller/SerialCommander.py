@@ -399,3 +399,17 @@ class SerialCommander(object):
             success = self.set_clamp_power(clamp, power_pct)
             successes.append(success)
         return successes
+
+
+class RosSerialCommander(SerialCommander):
+
+    from clamp_controller.RosCommand import ROS_COMMAND
+
+    def __init__(self):
+        SerialCommander.__init__(self)
+        from clamp_controller.RosClampCommandListener import RosClampCommandListener
+        self.ros_client = None  # type: RosClampCommandListener
+
+    def send_command_status_to_ros(self, command: ROS_COMMAND):
+        if self.ros_client is not None:
+            self.ros_client.send_command_status(command)

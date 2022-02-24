@@ -63,20 +63,20 @@ if __name__ == '__main__':
         ros_clamps = None
 
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
-    logger.info("Sending send_ROS_VEL_GOTO_COMMAND")
+    logger.info("Sending send")
     command_sent_time = time.time()
     velocity = 0.8
     position = 10
     power_percentage=80
     allowable_target_deviation=5
     clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id in clamps_id]
-    command = ROS_VEL_GOTO_COMMAND(None, clamps_pos_velo, power_percentage, allowable_target_deviation)
-    sequence_id = ros_clamps.send_ROS_VEL_GOTO_COMMAND(command)
+    command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
+    message = ros_clamps.send(command)
     clamp_command_ack_timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
     # Wait for ACK
     while (True):
-        if ros_clamps.sent_messages[sequence_id] == True:
-            logger.info("send_ROS_VEL_GOTO_COMMAND ACK received.")
+        if message.done == True:
+            logger.info("send ACK received.")
             break
         time_since = time.time() - command_sent_time
         # logger.debug(time_since)
