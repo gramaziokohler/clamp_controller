@@ -133,6 +133,23 @@ class ScrewdriverModel(object):
         return self._isDirectionExtend
 
     @property
+    def gripper_is_moving(self):
+        return self._raw_gripper_status in [1,2]
+
+    @property
+    def gripper_move_failed(self):
+        return self._raw_gripper_status in [5,6]
+
+    @property
+    def gripper_extend_success(self):
+        return self._raw_gripper_status == 3
+
+    @property
+    def gripper_retract_success(self):
+        return self._raw_gripper_status == 4
+
+
+    @property
     def state_to_data(self):
         """Function to serialize the device state into a dictionary that is serializible and passable over ROS"""
         data = {}

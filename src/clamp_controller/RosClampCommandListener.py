@@ -40,18 +40,7 @@ class RosClampCommandListener(Ros):
             message = RosMessage.from_received_roslibpy_message(received_roslibpy_message)
 
             # * Reconstruct Command
-            command = None
-            if message.command_type == "ROS_VEL_GOTO_COMMAND":
-                command = ROS_VEL_GOTO_COMMAND.from_data(message.command_data)
-            if message.command_type == "ROS_STOP_COMMAND":
-                command = ROS_STOP_COMMAND.from_data(message.command_data)
-            if message.command_type == "ROS_STOP_ALL_COMMAND":
-                command = ROS_STOP_ALL_COMMAND.from_data(message.command_data)
-            if message.command_type == "ROS_SCREWDRIVER_GRIPPER_COMMAND":
-                command = ROS_SCREWDRIVER_GRIPPER_COMMAND.from_data(message.command_data)
-            if message.command_type == "ROS_REQUEST_STATUSUPDATE":
-                command = ROS_REQUEST_STATUSUPDATE.from_data(message.command_data)
-            if command is None:
+            if message.command is None:
                 print("RosMessage received with no command. : %s" % message)
 
             # Ack the message with a empty message but same id
@@ -60,9 +49,9 @@ class RosClampCommandListener(Ros):
             self.message_ack_replier.publish(ack_message.to_roslibpy_message())
 
             # Store the received command message pair
-            self.received_command_message_pairs[command] = message
+            self.received_command_message_pairs[message.command] = message
             # Relay message to callback
-            self.command_callback(command, message)
+            self.command_callback(message.command, message)
 
         # Setup listener topic.
         self.listener = roslibpy.Topic(self, '/clamp_message', 'std_msgs/String')
@@ -79,10 +68,11 @@ class RosClampCommandListener(Ros):
         """
         # Create message to send
         reply_dict={}
-        message = self.received_command_message_pairs[command]
-        reply_dict['sequence_id'] = message.sequence_id
-        reply_dict['command_status'] = command.status
-        self.status_publisher.publish(roslibpy.Message(reply_dict))
+        orig_message = self.received_command_message_pairs[command]
+        # reply_command = ROS_COMMAND_STATUS(command, orig_message.sequence_id)
+        reply_command = ROS_COMMAND()
+        reply_command.status =command.status
+        self.status_publisher.publish(RosMessage.from_command(orig_message.sequence_id, reply_command).to_roslibpy_message())
 
 # Directly calling this script creates a listener that will print out messages.
 # It will also show the one way trip time.

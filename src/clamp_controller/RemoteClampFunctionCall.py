@@ -20,9 +20,11 @@ import time
 import datetime
 import json
 import roslibpy
+import logging
 
 from clamp_controller.RosCommand import *
 
+logger_ctr = logging.getLogger("app.remote_clamp_call")
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
@@ -89,6 +91,10 @@ class RosMessage(object):
             message.command = ROS_SCREWDRIVER_GRIPPER_COMMAND.from_data(dict['command_data'])
         if dict['command_type'] == "ROS_REQUEST_STATUSUPDATE":
             message.command = ROS_REQUEST_STATUSUPDATE.from_data(dict['command_data'])
+        if dict['command_type'] == "ROS_COMMAND_STATUS":
+            message.command = ROS_COMMAND_STATUS.from_data(dict['command_data'])
+        if dict['command_type'] == "ROS_COMMAND":
+            message.command = ROS_COMMAND.from_data(dict['command_data'])
 
         return message
 
@@ -118,7 +124,7 @@ class RemoteClampFunctionCall(Ros):
         Ros.__init__(self, host=host_ip, port=9090)
 
         # Communication control
-        self.sequence_id = -1
+        self.sequence_id = 0
 
         self.sent_messages = {}  # type: Dict[int, RosMessage]
         self.external_status_change_callback = status_change_callback
@@ -146,12 +152,6 @@ class RemoteClampFunctionCall(Ros):
             org_message.reply_receive_time = current_milli_time()
             self.last_received_message_time = current_milli_time()
 
-            # Retrive reply if it exist / # ! Not used at the moment
-            # if 'reply_type' in incoming_dict:
-            #     org_message.reply_type = incoming_dict['reply_type']
-            # if 'reply_data' in incoming_dict:
-            #     org_message.reply_type = incoming_dict['reply_data']
-
             # Print it to UI and keep track of one way latency.
             rtt = org_message.reply_receive_time - org_message.send_time
             print('Message %i ACK received. RoundTripTime = %s ' % (sequence_id, rtt))
@@ -169,17 +169,17 @@ class RemoteClampFunctionCall(Ros):
         #
         def status_callback(received_roslibpy_message):
             """Handles the command status message from the ToolController"""
-            # Relay message to callback
-            if self.external_status_change_callback is not None:
-                self.external_status_change_callback(received_roslibpy_message)
-
             # Retrive original sent message
-            sequence_id = received_roslibpy_message['sequence_id']
+            message = RosMessage.from_received_roslibpy_message(received_roslibpy_message)
+            sequence_id = message.sequence_id
+
+            # Retrive original sent message and change status
             org_message = self.sent_messages[sequence_id]
-            org_message.command.status = received_roslibpy_message['command_status']
+            org_message.command.status = message.command.status
 
             # Mark receive time
             self.last_received_message_time = current_milli_time()
+            print('Message %i StatusUpdate Received. status = %s ' % (sequence_id, message.command.status))
 
         # Setup listener topic.
         self.status_listener = roslibpy.Topic(self, '/clamp_command_status', 'std_msgs/String')
@@ -203,7 +203,7 @@ class RemoteClampFunctionCall(Ros):
 
         # * Keep track of the sent message
         self.sent_messages[message.sequence_id] = message
-        print("RosMessage Sent. message.data = ", message.to_sendable_dict())
+        print("Message %i Sent. sendable_dict=%s" %(message.sequence_id, message.to_sendable_dict()))
         self.sequence_id += 1  # Increment message counter
         return message
 
@@ -226,7 +226,7 @@ class RemoteClampFunctionCall(Ros):
 # CLI Loop
 if __name__ == "__main__":
 
-    hostip = '192.168.0.120'
+    hostip = '192.168.0.33'
     clamps_connection = RemoteClampFunctionCall(hostip)
     clamps_connection.run()
     # Command to send clamp to target (non-blocking)
@@ -262,6 +262,9 @@ if __name__ == "__main__":
                 print("send_and_wait() Message Success (Clamp Ack)")
             else:
                 print("send_and_wait() Message Fail (NACK)")
+
+            # while (True):
+            #     if command()
         # place message in dict to allow later retrivel for time comparision.
 
     clamps_connection.terminate()
