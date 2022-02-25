@@ -24,7 +24,7 @@ import logging
 
 from clamp_controller.RosCommand import *
 
-logger_ctr = logging.getLogger("app.remote_clamp_call")
+logger = logging.getLogger("app.remote_clamp_call")
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
@@ -142,6 +142,7 @@ class RemoteClampFunctionCall(Ros):
             """Handles the recepion of message ACK from the ToolController"""
             # Retrive the sent message and compare time
             if 'sequence_id' not in received_roslibpy_message['data']:
+                logger.debug("ACK received for Message %i that is not in our sent message.")
                 return
             # Retrive original sent message
             message = RosMessage.from_received_roslibpy_message(received_roslibpy_message)
@@ -154,7 +155,7 @@ class RemoteClampFunctionCall(Ros):
 
             # Print it to UI and keep track of one way latency.
             rtt = org_message.reply_receive_time - org_message.send_time
-            print('Message %i ACK received. RoundTripTime = %s ' % (sequence_id, rtt))
+            logger.info('Message %i ACK received. RoundTripTime = %s ' % (sequence_id, rtt))
 
         # Setup talker to send message
         self.talker = roslibpy.Topic(self, '/clamp_message', 'std_msgs/String')
@@ -174,12 +175,15 @@ class RemoteClampFunctionCall(Ros):
             sequence_id = message.sequence_id
 
             # Retrive original sent message and change status
+            if sequence_id not in self.sent_messages:
+                return
+
             org_message = self.sent_messages[sequence_id]
             org_message.command.status = message.command.status
 
             # Mark receive time
             self.last_received_message_time = current_milli_time()
-            print('Message %i StatusUpdate Received. status = %s ' % (sequence_id, message.command.status))
+            logger.info('Message %i StatusUpdate Received. status = %s ' % (sequence_id, message.command.status))
 
         # Setup listener topic.
         self.status_listener = roslibpy.Topic(self, '/clamp_command_status', 'std_msgs/String')
@@ -203,7 +207,7 @@ class RemoteClampFunctionCall(Ros):
 
         # * Keep track of the sent message
         self.sent_messages[message.sequence_id] = message
-        print("Message %i Sent. sendable_dict=%s" %(message.sequence_id, message.to_sendable_dict()))
+        logger.info("Message %i Sent. sendable_dict=%s" %(message.sequence_id, message.to_sendable_dict()))
         self.sequence_id += 1  # Increment message counter
         return message
 
@@ -225,8 +229,14 @@ class RemoteClampFunctionCall(Ros):
 
 # CLI Loop
 if __name__ == "__main__":
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    log_console_handler = logging.StreamHandler()
+    log_console_handler.setLevel(logging.DEBUG)
+    log_console_handler.setFormatter(formatter)
+    logger.addHandler(log_console_handler)
 
-    hostip = '192.168.0.33'
+    hostip = '192.168.0.120'
     clamps_connection = RemoteClampFunctionCall(hostip)
     clamps_connection.run()
     # Command to send clamp to target (non-blocking)
@@ -251,17 +261,17 @@ if __name__ == "__main__":
                 _pos, _vel = i.split(',')
                 position = float(_pos)
                 velocity = float(_vel)
-                if (position < 95.0 or position > 220.0):
+                if (position < -100 or position > 100.0):
                     raise ValueError
             except:
-                print("Bad Input, position range (95-220). Try again:\n")
+                logger.info("Bad Input, position range (-100-100). Try again:\n")
                 continue
             command = ROS_VEL_GOTO_COMMAND([(clamp_id, position, velocity)], power_percentage, 2)
             success = clamps_connection.send_and_wait(command)
             if success:
-                print("send_and_wait() Message Success (Clamp Ack)")
+                logger.info("send_and_wait() Message Success (Clamp Ack)")
             else:
-                print("send_and_wait() Message Fail (NACK)")
+                logger.info("send_and_wait() Message Fail (NACK)")
 
             # while (True):
             #     if command()

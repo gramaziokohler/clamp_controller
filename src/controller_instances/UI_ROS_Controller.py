@@ -42,17 +42,27 @@ def background_thread(guiref, commander: RosSerialCommander, q):
     # This is a sudo time-split multi-task with priority execution.
     # Tasks higher up in the list have higher priority.
     # Task must return True if it was executed and return False if it was not executed.
-    logging.getLogger("app.bg").info("Background Thread Started")
+    logger = logging.getLogger("app.bg")
+    logger.info("Background Thread Started")
     while True:
         if handle_background_commands(guiref, commander, q):
             continue
-        if update_status(guiref, commander):
-            # Check active command
-            check_active_command(guiref, commander)
-            # Send ros status update
-            if commander.last_ros_command is not None:
-                commander.send_command_status_to_ros(commander.last_ros_command)
-            continue
+
+        # * Polls Status updates from device and updates UI
+        update_status(guiref, commander)
+
+        # * Monitoring active command
+        active_command = commander.get_running_command()
+        if active_command is not None:
+            logger.info("Monitoring Active Command: %s" % active_command.__class__.__name__)
+            if type(active_command) == ROS_VEL_GOTO_COMMAND:
+                check_sync_move(commander, active_command)
+            if type(active_command) == ROS_SCREWDRIVER_GRIPPER_COMMAND:
+                check_screwdriver_gripper_move(commander, active_command)
+
+            # * Send ros status update
+            commander.send_command_status_to_ros(commander.last_ros_command)
+
     logging.getLogger("app.bg").info("Background Thread Stopped")
 
 
@@ -240,6 +250,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
         # * Handelling ROS_VEL_GOTO_COMMAND
         if type(msg) == ROS_VEL_GOTO_COMMAND:
             command = msg  # type: ROS_VEL_GOTO_COMMAND
+            print(command.data)
             # Keep track if the command is completed successful.
             # This will be set back to true by the sync watcher
             commander.fail_last_running_command()
@@ -405,7 +416,7 @@ def update_status(guiref, commander: RosSerialCommander):
         # * Request a status update from clamp commander
         if isinstance(commander.last_ros_command, RequireMonitoring):
             # * If a command is active, only the clamps in the command are polled.
-            active_clamps = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in commander.last_ros_command.get_monitoring_tool_ids]
+            active_clamps = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in commander.last_ros_command.get_monitoring_tool_ids()]
             updated_clamps = commander.update_clamps_status(active_clamps, 1)
         elif any([clamp.isMotorRunning for clamp in commander.get_clamps()]):
             # *  Update clamps whose motors are running
@@ -478,17 +489,8 @@ def update_status(guiref, commander: RosSerialCommander):
         return False
 
 
-def check_active_command(guiref, commander: RosSerialCommander):
-    command = commander.get_running_command()
-    if command is not None:
-        if type(commander) == ROS_VEL_GOTO_COMMAND:
-            check_sync_move(commander, command)
-        if type(commander) == ROS_SCREWDRIVER_GRIPPER_COMMAND:
-            check_screwdriver_gripper_move(commander, command)
-
-
 def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND) -> bool:
-    """ This function checks all the clamps in ROS_VEL_GOTO_COMMAND.get_monitoring_tool_ids
+    """ This function checks all the clamps in ROS_VEL_GOTO_COMMAND.get_monitoring_tool_ids()
     The following check is performed:
     - If any clamp in the list have not reached its target (within threshold) and have stopped moveing.
     - Maybe other checkes will be added in the future.
@@ -501,6 +503,7 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
 
     active_clamp_status_timeout_ms = 3500
     clamp_ids = command.get_monitoring_tool_ids()
+    clamp_pos_velo = [(commander.get_clamp_by_process_tool_id(clamp_id), p, v) for (clamp_id, p, v) in command.clamps_pos_velo]
 
     def fail_routine(failed_clamp_id):
         # Send stop command to all acive clamps, messaging the failed_clamp_id last
@@ -514,7 +517,7 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
         commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.FAILED)
 
     # * Check every clamp that should be moving
-    for clamp, target_jaw_position, velo in command.clamps_pos_velo:
+    for clamp, target_jaw_position, velo in clamp_pos_velo:
         # * Compute target success based on allowable_target_deviation
         target_reached = abs(target_jaw_position - clamp.currentJawPosition) < command.allowable_target_deviation
         if clamp.isMotorRunning == False and target_reached == False:
@@ -529,10 +532,10 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
             return False
 
     # * Success if all clamps reached target or stopped
-    if not any([c.isMotorRunning for c, _, _ in command.clamps_pos_velo]):
+    if not any([clamp.isMotorRunning for clamp, _, _ in clamp_pos_velo]):
         logger_sync.info("Sync Move Monitoring Completed. All clamps stopped.")
-        for clamp, target_jaw_position, _ in command.clamps_pos_velo:
-            logger_sync.info("Sync Move Complete - %s current_pos = %0.1fmm (target = %0.1fmm)" % (clamp, clamp.currentJawPosition, target_jaw_position))
+        for clamp, target_jaw_position, _ in clamp_pos_velo:
+            logger_sync.info("Sync Move Complete - %s current_pos = %0.1fmm (target = %0.1fmm)" % (clamp.process_tool_id, clamp.currentJawPosition, target_jaw_position))
         commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.SUCCEED)
         return False
 

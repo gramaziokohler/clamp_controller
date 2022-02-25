@@ -125,7 +125,7 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     # Catch all during Development
     else:
         execute_some_delay(model, movement)
-        logger_exe.warn("execution code for %s does not exist." % movement)
+        logger_exe.warning("execution code for %s does not exist." % movement)
         return False
 
 #####################################################
@@ -264,7 +264,7 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
             if movement.digital_output == DigitalOutput.LockTool:
                 # Assert ToolChanger Lock Check signal is HIGH (1)
                 if not wait_for_digital_signal('diUnitR11In3', 1):
-                    logger_exe.warn("UI stop button pressed before getting confirm signal.")
+                    logger_exe.warning("UI stop button pressed before getting confirm signal.")
                     return False
                 else:
                     logger_exe.info("Toolchanger sensor signal received. DigitalOutput.LockTool is successful")
@@ -275,7 +275,7 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
             if movement.digital_output == DigitalOutput.UnlockTool:
                 # Assert ToolChanger Lock Check signal is HIGH (1)
                 if not wait_for_digital_signal('diUnitR11In3', 0):
-                    logger_exe.warn("UI stop button pressed before getting confirm signal.")
+                    logger_exe.warning("UI stop button pressed before getting confirm signal.")
                     return False
                 else:
                     logger_exe.info("Toolchanger sensor signal received. DigitalOutput.UnlockTool is successful")
@@ -287,12 +287,12 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
                 # Add some delay after the action and assume it is done
                 future = send_and_wait_unless_cancel(model, rrc.WaitTime(2))
                 if not future.done:
-                    logger_exe.warn("UI stop button pressed before WaitTime(2) is over.")
+                    logger_exe.warning("UI stop button pressed before WaitTime(2) is over.")
                     return False
                 else:
                     return True
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn(
+            logger_exe.warning(
                 "UI stop button pressed before RoboticDigitalOutput (%s) is completed." % movement)
             return False
         time.sleep(0.05)
@@ -341,7 +341,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
 
         # Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("Screwdriver Gripper Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            logger_exe.warning("Screwdriver Gripper Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND([movement.tool_id]))
             return False
         time.sleep(0.02)
@@ -368,7 +368,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
 
         # Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn(
+            logger_exe.warning(
                 "UI stop button pressed before Screwdriver Gripper Movement (%s) is completed." % movement.movement_id)
             model.ros_clamps.send(ROS_STOP_COMMAND([movement.tool_id]))
             return False
@@ -397,7 +397,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     STEPS_TO_BUFFER = 3  # Number of steps to allow in the robot buffer
 
     if movement.trajectory is None:
-        logger_exe.warn("Attempt to execute movement with no trajectory")
+        logger_exe.warning("Attempt to execute movement with no trajectory")
         return False
 
     # Set Acceleration Settings
@@ -407,7 +407,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         acc, ramp = get_free_move_acc_ramp(guiref)
     result = send_and_wait_unless_cancel(model, rrc.SetAcceleration(acc, ramp))
     if result.done == False:
-        logger_exe.warn("execute_robotic_*_movement() stopped beacause user canceled while SetAcceleration().")
+        logger_exe.warning("execute_robotic_*_movement() stopped beacause user canceled while SetAcceleration().")
         return False
 
     # We store the future results of the movement commands in this list.
@@ -424,7 +424,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     if get_softness_enable(guiref):
         if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
-            logger_exe.warn("execute_robotic_*_movement() stopped beacause robot_softmove_blocking() failed.")
+            logger_exe.warning("execute_robotic_*_movement() stopped beacause robot_softmove_blocking() failed.")
             return False
 
     # In case of a START_FROM_PT
@@ -491,7 +491,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
 
             # Breaks entirely if model.run_status is STOPPED
             if model.run_status == RunStatus.STOPPED:
-                logger_exe.warn("UI stop button pressed before Robotic Free Movement (%s) is completed." % (movement.movement_id))
+                logger_exe.warning("UI stop button pressed before Robotic Free Movement (%s) is completed." % (movement.movement_id))
                 return False
 
     # Final deviation
@@ -500,7 +500,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
         logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
         guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
     else:
-        logger_exe.warn("execute_robotic_*_movement stopped before deviation result (future not arrived)")
+        logger_exe.warning("execute_robotic_*_movement stopped before deviation result (future not arrived)")
         return False
 
     return True
@@ -528,7 +528,7 @@ def clear_robot_movement_buffers(model: RobotClampExecutionModel):
         if result == 1.0:
             break
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("clear_robot_movement_buffers() stopped by user before do_A067_InterruptDone signal is high.")
+            logger_exe.warning("clear_robot_movement_buffers() stopped by user before do_A067_InterruptDone signal is high.")
             return False
 
     model.ros_robot.send(rrc.SetDigital('do_A067_Interrupt', 0))
@@ -567,13 +567,13 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     """
 
     if movement.trajectory is None:
-        logger_exe.warn("Attempt to execute movement with no trajectory")
+        logger_exe.warning("Attempt to execute movement with no trajectory")
         return False
 
     # * Set Acceleration Settings to 100% (minimize aceleration phase)
     result = send_and_wait_unless_cancel(model, rrc.SetAcceleration(100, 100))
     if result.done == False:
-        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while SetAcceleration().")
+        logger_exe.warning("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while SetAcceleration().")
         return False
 
     # * Prepare Movement command parameters
@@ -592,17 +592,17 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     if get_softness_enable(guiref):
         if not robot_softmove_blocking(model, enable=movement.softmove, soft_direction=get_soft_direction(guiref),
                                        stiffness=get_stiffness_soft_dir(guiref), stiffness_non_soft_dir=get_stiffness_nonsoft_dir(guiref)):
-            logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause robot_softmove_blocking() failed.")
+            logger_exe.warning("execute_robotic_clamp_sync_linear_movement() stopped beacause robot_softmove_blocking() failed.")
             return False
 
     # * Clear (potentially any) Robot Movement Buffered in the Robot Controller (RAPID side)
     if not clear_robot_movement_buffers(model):
-        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause clear_robot_movement_buffers() failed.")
+        logger_exe.warning("execute_robotic_clamp_sync_linear_movement() stopped beacause clear_robot_movement_buffers() failed.")
         return False
 
     # * Check to ensures Speed Ratio is 100 %
     if not ensure_speed_ratio(model, model.ros_robot, 100):
-        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause ensure_speed_ratio() failed.")
+        logger_exe.warning("execute_robotic_clamp_sync_linear_movement() stopped beacause ensure_speed_ratio() failed.")
         return False
 
     def stop_clamps():
@@ -617,7 +617,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     # * User Press PLAY to Sart the Movement
     result = send_and_wait_unless_cancel(model, rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move begins']))
     if result.done == False:
-        logger_exe.warn("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
+        logger_exe.warning("execute_robotic_clamp_sync_linear_movement() stopped beacause user canceled while waiting for TP Press Play.")
         return False
 
     # * Retrive screwdriver motion parameters
@@ -647,14 +647,14 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         time_since = time.time() - clamp_command_sent_time
         # * Fail Condition - Clamp Command not ACKed
         if time_since > clamp_command_ack_timeout:
-            logger_exe.warn("RoboticClampSync Movement (%s) stopped because ACK not received from clamp controller within %s sec." %
+            logger_exe.warning("RoboticClampSync Movement (%s) stopped because ACK not received from clamp controller within %s sec." %
                             (movement.movement_id, clamp_command_ack_timeout))
             stop_clamps()
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Clamp Controller no ACK, cannot continue.']))
             return False
         # * Fail Condition - UI Cancel
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("RoboticClampSync Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            logger_exe.warning("RoboticClampSync Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
             return False
         time.sleep(0.05)
@@ -712,7 +712,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         # * Monitor if the Clamp have started running
         if clamp_command.status != ROS_COMMAND.RUNNING:
             if current_milli_time() - message.send_time > CLAMP_START_RUNNING_TIMEOUT * 1000:
-                logger_exe.warn("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
+                logger_exe.warning("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
                 stop_clamps()
                 stop_robots()
                 model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['"Sync Lost: Clamp status did not start running.']))
@@ -722,7 +722,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         # * Monitor if the Clamp Controller is still alive
         if clamp_command.status == ROS_COMMAND.RUNNING:
             if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
-                logger_exe.warn("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
+                logger_exe.warning("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
                 stop_clamps()
                 stop_robots()
                 model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp Commander not alive.']))
@@ -731,7 +731,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
         # * Monitor if the Clamp Controller reports a failed sync move.
         if clamp_command.status == ROS_COMMAND.FAILED:
-            logger_exe.warn("Sync Lost: Clamp Command Failed.")
+            logger_exe.warning("Sync Lost: Clamp Command Failed.")
             stop_robots()
             stop_clamps()
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp Command Failed.']))
@@ -742,14 +742,14 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         task_excstate = model.ros_robot.send_and_wait(rrc.GetTaskExecutionState('T_ROB11'))
         # The task_excstate is still `started` even when the motion is completed.
         if task_excstate != "started":
-            logger_exe.warn("Sync Lost: Robot Controller Task stopped.")
+            logger_exe.warning("Sync Lost: Robot Controller Task stopped.")
             stop_clamps()
             stop_robots()
             return False
 
         # * Monitor if UI Cancel
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("Sync Movement stopped from controller UI")
+            logger_exe.warning("Sync Movement stopped from controller UI")
             stop_clamps()
             stop_robots()
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Movement stopped from controller UI.']))
@@ -772,7 +772,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     #     logger_exe.info("Movement (%s) target frame deviation %s mm" % (movement.movement_id, deviation))
     #     guiref['exe']['last_deviation'].set("%.2fmm" % (deviation))
     # else:
-    #     logger_exe.warn("execute_robotic_clamp_sync_linear_movement stopped before deviation result (future not arrived)")
+    #     logger_exe.warning("execute_robotic_clamp_sync_linear_movement stopped before deviation result (future not arrived)")
     #     return False
     return True
 
@@ -811,7 +811,7 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
             break
 
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            logger_exe.warning("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
             return False
 
@@ -835,13 +835,13 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         # * Monitor if the Clamp Controller is still alive
         if command.status == ROS_COMMAND.RUNNING:
             if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
-                logger_exe.warn("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
+                logger_exe.warning("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
                 model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
                 return False
 
         # * Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn(
+            logger_exe.warning(
                 "UI stop button pressed before Robotic Clamp Jaw Movement (%s) is completed." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
             return False
@@ -861,7 +861,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
         starting_robot_joints, starting_ext_axis = future.value
         logger_exe.info("Initial Joints: %s, %s" % (starting_robot_joints, starting_ext_axis))
     else:
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) GetJoints is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) GetJoints is completed." % (movement.movement_id))
         return False
 
     ############################################
@@ -873,7 +873,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     if future.done:
         logger_exe.info("rrc.stop() returned")
     else:
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) rrc.Stop is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) rrc.Stop is completed." % (movement.movement_id))
         return False
 
     # Use UI Button to pause and confirm
@@ -902,7 +902,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
         new_frame, new_ext_axes = future.value
         logger_exe.info("Frame after Jog: %s" % (new_frame))
     else:
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) GetRobTarget is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) GetRobTarget is completed." % (movement.movement_id))
         return False
 
     future = send_and_wait_unless_cancel(model, rrc.GetJoints())
@@ -910,7 +910,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
         new_robot_joints, new_ext_axes = future.value
         logger_exe.info("Joints after Jog: %s, %s" % (new_robot_joints, new_ext_axes))
     else:
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) GetJoints is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) GetJoints is completed." % (movement.movement_id))
         return False
     ############################################
 
@@ -942,7 +942,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
     future = send_and_wait_unless_cancel(model, rrc.Stop())
     if not future.done:
         logger_exe.info("rrc.stop() returned")
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) rrc.Stop is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) rrc.Stop is completed." % (movement.movement_id))
         return False
 
     move_joint_instruction = robot_state_to_instruction(guiref, model, movement.end_state['robot'].kinematic_config, 30, rrc.Zone.FINE)
@@ -953,7 +953,7 @@ def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionM
         model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ["Gantry Move Complete"], []))
         logger_exe.info("OperatorAddJogOffset gantry move is complete")
     else:
-        logger_exe.warn("UI stop button pressed before OperatorAddJogOffset (%s) TPPlot is completed." % (movement.movement_id))
+        logger_exe.warning("UI stop button pressed before OperatorAddJogOffset (%s) TPPlot is completed." % (movement.movement_id))
         return False
 
     return True
@@ -1008,7 +1008,7 @@ def execute_jog_robot_to_config(guiref, model, config: Configuration, message: s
         logger_exe.info("execute_jog_robot_to_config complete")
         model.run_status = RunStatus.STOPPED
     else:
-        logger_exe.warn("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
+        logger_exe.warning("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
 
     # Trigger update Status
     q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
@@ -1023,7 +1023,7 @@ def execute_operator_add_visual_offset_movement(guiref, model: RobotClampExecuti
     # Open a dialog and ask user to key in three offset values
     # Apply offset to flange frame offset, jog robot to the movement.end_state
     if not model.process.movement_has_end_robot_config(movement):
-        logger_exe.warn("Error Attempt to execute OperatorAddVisualOffset but the movement end_state does not have robot config.")
+        logger_exe.warning("Error Attempt to execute OperatorAddVisualOffset but the movement end_state does not have robot config.")
         return False
 
     dialog = VisualOffsetPopup(guiref, model, movement)
@@ -1043,7 +1043,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
         return False
 
     if not model.process.movement_has_end_robot_config(movement):
-        logger_exe.warn("Error Attempt to execute execute_acquire_docking_offset but the movement end_state does not have robot config.")
+        logger_exe.warning("Error Attempt to execute execute_acquire_docking_offset but the movement end_state does not have robot config.")
         return False
 
     camera_stream_name = movement.tool_id
@@ -1099,7 +1099,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
 
             # Check if user pressed stop button in UI
             if model.run_status == RunStatus.STOPPED:
-                logger_exe.warn(
+                logger_exe.warning(
                     "UI stop button pressed before AcquireDockingOffset (%s) is completed." % movement.movement_id)
                 listener.unsubscribe()
                 return False
@@ -1115,7 +1115,7 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
         # * Sanity check
         correction_max = 30
         if (correction_amount_XY > correction_max and correction_amount_Z > correction_max):
-            logger_exe.warn("Correction larger than allowable threshold: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" % (correction_amount_XY, correction_max, correction_amount_Z, correction_max))
+            logger_exe.warning("Correction larger than allowable threshold: XY = %1.2f (threshold = %1.2f), Z = %1.2f (threshold = %1.2f)" % (correction_amount_XY, correction_max, correction_amount_Z, correction_max))
             return False
 
         logger_exe.info("Correction amount (relative to current position) (in Flange Coordinates): XY = %1.2f , Z = %1.2f" % (correction_amount_XY, correction_amount_Z))
@@ -1135,10 +1135,10 @@ def execute_acquire_docking_offset(guiref, model: RobotClampExecutionModel, move
         if future.done:
             logger_exe.info("Robot move to new offset value complete.")
         else:
-            logger_exe.warn("UI stop button pressed before MoveToJoints in AcquireDockingOffset Movement is completed.")
+            logger_exe.warning("UI stop button pressed before MoveToJoints in AcquireDockingOffset Movement is completed.")
             return False
 
-    logger_exe.warn("AcquireDockingOffset exhausted maxIteration %s without convergence" % max_iteration)
+    logger_exe.warning("AcquireDockingOffset exhausted maxIteration %s without convergence" % max_iteration)
     return False
 
 
@@ -1222,7 +1222,7 @@ def execute_some_delay(model: RobotClampExecutionModel, movement: Movement):
     for _ in range(10):
         time.sleep(0.3)
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warn("UI stop button pressed before execute_some_delay (%s) is completed." % (movement.movement_id))
+            logger_exe.warning("UI stop button pressed before execute_some_delay (%s) is completed." % (movement.movement_id))
             return False
     return True
 
@@ -1287,7 +1287,7 @@ def robot_softmove_blocking(model: RobotClampExecutionModel, enable: bool, soft_
                 return True
             # Stop waiting if model.run_status is STOPPED
             if model.run_status == RunStatus.STOPPED:
-                logger_exe.warn(
+                logger_exe.warning(
                     "robot_softmove_blocking stopped before future.done arrived")
                 return False
 
@@ -1313,7 +1313,7 @@ def compute_marker_correction(guiref, model: RobotClampExecutionModel, movement:
 
     # Retrive the selected movement target frame
     if not hasattr(movement, 'target_frame'):
-        logger_model.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
+        logger_model.warning("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
         return False
     current_movement_target_frame = movement.target_frame
     t_world_from_currentflange = Transformation.from_frame(current_movement_target_frame)

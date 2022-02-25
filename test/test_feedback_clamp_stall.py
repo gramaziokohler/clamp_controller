@@ -52,6 +52,15 @@ CLAMP_START_RUNNING_TIMEOUT = 0.7
 CLAMP_CONTROLLER_ALIVE_TIMEOUT = 3.5
 
 if __name__ == '__main__':
+    logger = logging.getLogger("app")
+
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    log_console_handler = logging.StreamHandler()
+    log_console_handler.setLevel(logging.DEBUG)
+    log_console_handler.setFormatter(formatter)
+    logger.addHandler(log_console_handler)
+
 
     ip = "192.168.0.120"
     ros_clamps = RemoteClampFunctionCall(ip)
@@ -93,26 +102,26 @@ if __name__ == '__main__':
 
     # Track progress
     while(True):
+        # * Monitor if the Clamp Controller reports a failed sync move.
+        if clamp_command.status == ROS_COMMAND.SUCCEED:
+            logger_exe.warning("Clamp Move succeeded.")
+            exit(-1)
+
         # * Monitor if the Clamp have started running
         if clamp_command.status != ROS_COMMAND.RUNNING:
             if current_milli_time() - message.send_time > CLAMP_START_RUNNING_TIMEOUT * 1000:
-                logger_exe.warn("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
+                logger_exe.warning("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
                 exit(-1)
 
         # * Monitor if the Clamp Controller is still alive
         if clamp_command.status == ROS_COMMAND.RUNNING:
             if ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
-                logger_exe.warn("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
+                logger_exe.warning("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
                 exit(-1)
 
         # * Monitor if the Clamp Controller reports a failed sync move.
         if clamp_command.status == ROS_COMMAND.FAILED:
-            logger_exe.warn("Sync Lost: Clamp Command Failed.")
-            exit(-1)
-
-        # * Monitor if the Clamp Controller reports a failed sync move.
-        if clamp_command.status == ROS_COMMAND.SUCCEED:
-            logger_exe.warn("Clamp Move succeeded.")
+            logger_exe.warning("Sync Lost: Clamp Command Failed.")
             exit(-1)
 
         time.sleep(0.05)

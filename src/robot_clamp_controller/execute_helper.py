@@ -100,7 +100,7 @@ def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement:
 
     # Retrive the selected movement target frame
     if not hasattr(movement, 'target_frame'):
-        logger_exe.warn("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
+        logger_exe.warning("compute_visual_correction used on movement %s without target_frame" % (movement.movement_id))
         return False
     current_movement_target_frame = movement.target_frame
 

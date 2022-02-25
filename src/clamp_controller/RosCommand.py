@@ -56,16 +56,16 @@ class ROS_VEL_GOTO_COMMAND(ROS_COMMAND, RequireMonitoring):
 
     def __init__(self, clamps_pos_velo: List[Tuple[str, float, float]] = [], power_percentage=100, allowable_target_deviation=0):
         super().__init__()
-        self.clamps_pos_velo = clamps_pos_velo
+        self.clamps_pos_velo = clamps_pos_velo  # type : List[Tuple[str, float, float]]
         self.power_percentage = power_percentage
         self.allowable_target_deviation = allowable_target_deviation
 
     @property
     def data(self):
         data = super(ROS_VEL_GOTO_COMMAND, self).data
-        data['clamps_pos_velo'] = self.clamps_pos_velo,
-        data['power_percentage'] = self.power_percentage,
-        data['clamps_pos_velo'] = self.clamps_pos_velo,
+        data['clamps_pos_velo'] = self.clamps_pos_velo
+        data['power_percentage'] = self.power_percentage
+        data['allowable_target_deviation'] = self.allowable_target_deviation
         return data
 
     @data.setter
@@ -87,7 +87,7 @@ class ROS_STOP_COMMAND(ROS_COMMAND):
     @property
     def data(self):
         data = super(ROS_STOP_COMMAND, self).data
-        data['tools_id'] = self.tools_id,
+        data['tools_id'] = self.tools_id
         return data
 
     @data.setter
@@ -109,8 +109,8 @@ class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND, RequireMonitoring):
     @property
     def data(self):
         data = super(ROS_SCREWDRIVER_GRIPPER_COMMAND, self).data
-        data['tools_id'] = self.tools_id,
-        data['extend'] = self.extend,
+        data['tools_id'] = self.tools_id
+        data['extend'] = self.extend
         return data
 
     @data.setter

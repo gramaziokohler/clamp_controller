@@ -98,7 +98,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     tree.see(msg.beam_id)
                     logger_bg.info("Scrolling Treeview to see %s" % msg.beam_id)
                 else:
-                    logger_bg.warn("Cannot find Treeview item: %s" % msg.beam_id)
+                    logger_bg.warning("Cannot find Treeview item: %s" % msg.beam_id)
 
             # Handle UI_UPDATE_STATUS
             if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_UPDATE_STATUS):
@@ -227,7 +227,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 tree_row_id = treeview_get_selected_id(guiref)
                 movement = model.movements[tree_row_id]
                 if not model.process.movement_has_start_robot_config(movement):
-                    logger_bg.warn(
+                    logger_bg.warning(
                         "Selected item does not have a START robot config")
                     return False
 
@@ -245,7 +245,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 tree_row_id = treeview_get_selected_id(guiref)
                 movement = model.movements[tree_row_id]
                 if not model.process.movement_has_end_robot_config(movement):
-                    logger_bg.warn(
+                    logger_bg.warning(
                         "Selected item does not have an END robot config")
                     return False
 
@@ -323,21 +323,21 @@ def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
         return False
     if check_loaded_process:
         if model.process is None:
-            logger_bg.warn("Load Process first.")
+            logger_bg.warning("Load Process first.")
             return False
     if check_robot_connection:
         if (model.ros_robot is None) or (not model.ros_robot.ros.is_connected):
-            logger_bg.warn("Connect ROS Robot first.")
+            logger_bg.warning("Connect ROS Robot first.")
             return False
     if check_status_is_stopped:
         if model.run_status != RunStatus.STOPPED:
-            logger_bg.warn(
+            logger_bg.warning(
                 "Run Status is not stopped: %s. Stop it first." % model.run_status)
             return False
     if check_selected_is_movement:
         tree_row_id = treeview_get_selected_id(guiref)
         if not tree_row_id.startswith('m'):
-            logger_bg.warn(
+            logger_bg.warning(
                 "Selected item is not a movement: %s. Cannot proceed." % tree_row_id)
             return False
     # Return True if every check is passed
