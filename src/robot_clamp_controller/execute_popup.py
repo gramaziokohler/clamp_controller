@@ -81,7 +81,7 @@ class ShakeGantryPopup(object):
         self.value = None
 
     def shake(self):
-        self.q.put(SimpleNamespace(type=BackgroundCommand.UI_SHAKE_GANTRY, shake_amount=self.shake_amount.get(), shake_speed=self.shake_speed.get(), shake_repeat=self.shake_repeat.get()))
+        self.q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_SHAKE_GANTRY, shake_amount=self.shake_amount.get(), shake_speed=self.shake_speed.get(), shake_repeat=self.shake_repeat.get()))
         pass
     #     compute_visual_correction(self.guiref, self.model, self.movement)
     #     compute_visual_correction(self.guiref, self.model, self.movement)
@@ -91,7 +91,7 @@ class ShakeGantryPopup(object):
 
     def cancel(self):
         self.model.run_status = RunStatus.STOPPED
-        self.q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+        self.q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
         self.window.destroy()
 
 class MovementJsonPopup(object):

@@ -50,8 +50,10 @@ before returning.
 INTERMEDIATE_ZONE = rrc.Zone.Z5
 FINAL_ZONE = rrc.Zone.FINE
 
+# TIMEOUT values in seconds
 CLAMP_START_RUNNING_TIMEOUT = 0.7
 CLAMP_CONTROLLER_ALIVE_TIMEOUT = 3.5
+CLAMP_COMMAND_ACK_TIMEOUT = 0.7
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
@@ -304,74 +306,47 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
             "Screwdriver gripper movement cannot start because Clamp ROS is not connected")
         return False
 
-    # Ping Screwdriver Controller and get a status update\
-    model.ros_clamps.send("ROS_REQUEST_STATUSUPDATE", None)
-    timeout_threshold = 2
-    start = time.time()
-    model.ros_clamps.clamps_status = {}
-    while(time.time() < start + timeout_threshold):
-        if model.ros_clamps.clamps_status != {}:
-            break
-    if model.ros_clamps.clamps_status == {}:
-        logger_exe.error("Screwdriver Controller did not respond with status update request.")
-        return False
-
-    # Remove clamp prefix:
     # * Send command to Clamp Controller, wait for ROS controller to ACK
-    model.ros_clamps.last_command_success = None
     if movement.digital_output == DigitalOutput.OpenGripper:
         # * Open Gripper
-        message = model.ros_clamps.send(ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, False))
-        model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 2
+        command = ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, False)
         logger_exe.info("Sending ROS_SCREWDRIVER_GRIPPER_COMMAND (Extend = False) Movement (%s)" % (movement.movement_id))
     elif movement.digital_output == DigitalOutput.CloseGripper:
         # * Close Gripper
-        message = model.ros_clamps.send(ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, True))
+        command = ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, True)
         logger_exe.info("Sending ROS_SCREWDRIVER_GRIPPER_COMMAND (Extend = True) Movement (%s)" % (movement.movement_id))
-        model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 1
     else:
         logger_exe.error("Screwdriver Movement (%s) not supported for digital_output type: %s" % (movement.movement_id, movement.digital_output))
         return False
 
-    while (True):
-        # Sucess Condition - ACK Received
-        if message.acked:
-            logger_exe.info("ROS_GRIPPER command ACK received.")
-            break
+    message = model.ros_clamps.send(command)
 
-        # Check if user pressed stop button in UI
+    while (True):
+        # * Sucess Condition - command succeed
+        if command.status == ROS_COMMAND.SUCCEED:
+            logger_exe.info("Screwdriver Gripper Movement (%s) completed." % movement.movement_id)
+            return True
+
+        # * Fail Condition - command failed
+        if command.status == ROS_COMMAND.FAILED:
+            logger_exe.info("Screwdriver Gripper Movement (%s) stopped or jammed." % movement.movement_id)
+            return False
+
+        # * Fail Condition - Clamp Command not ACKed
+        if not message.acked and message.ms_since_send > CLAMP_COMMAND_ACK_TIMEOUT * 1000:
+            logger_exe.warning("RoboticDigitalOutput (%s) stopped because ACK not received from clamp controller within %s sec." %
+                            (movement.movement_id, CLAMP_COMMAND_ACK_TIMEOUT))
+            model.ros_clamps.send(ROS_STOP_COMMAND([movement.tool_id]))
+            model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Clamp Controller no ACK, cannot continue.']))
+            return False
+
+        # * Stop Condition - User pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
-            logger_exe.warning("Screwdriver Gripper Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            logger_exe.warning("Screwdriver Gripper Movement (%s) stopped by user." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND([movement.tool_id]))
             return False
+
         time.sleep(0.02)
-
-    # Wait for next status update
-    model.ros_clamps.clamps_status_count = 0
-
-    # Wait for screwdriver to complete
-    while (True):
-        # Check if clamps are running or not
-        # g_status 1 or 2 is moving, 3 or 4 is success, 5 or 6 is fail
-        if model.ros_clamps.clamps_status_count > 0:
-            raw_gripper_status = model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status']
-
-            if raw_gripper_status in [3, 4]:
-                logger_exe.info("Screwdriver Gripper Movement (%s) completed." % movement.movement_id)
-                logger_exe.info("Screwdriver %s status: %s" % (movement.tool_id, model.ros_clamps.clamps_status[movement.tool_id]))
-                model.ros_clamps.last_command_success = True
-                return True
-            elif raw_gripper_status in [5, 6]:
-                logger_exe.info("Screwdriver Gripper Movement (%s) stopped or jammed." % movement.movement_id)
-                logger_exe.info("Screwdriver %s status: %s" % (movement.tool_id, model.ros_clamps.clamps_status[movement.tool_id]))
-                return False
-
-        # Check if user pressed stop button in UI
-        if model.run_status == RunStatus.STOPPED:
-            logger_exe.warning(
-                "UI stop button pressed before Screwdriver Gripper Movement (%s) is completed." % movement.movement_id)
-            model.ros_clamps.send(ROS_STOP_COMMAND([movement.tool_id]))
-            return False
 
 
 def execute_operator_attach_tool_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAttachToolMovement):
@@ -634,21 +609,19 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
     logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (clamp_ids, position))
-    clamp_command_sent_time = time.time()
+
     clamp_command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
     message = model.ros_clamps.send(clamp_command)
-    clamp_command_ack_timeout = 0.5  # ! Timeout for Clamp Controller to ACK command
 
     while (True):
         # Sucess Condition - ACK Received
-        if message.done == True:
+        if message.acked == True:
             logger_exe.info("send ACK received.")
             break
-        time_since = time.time() - clamp_command_sent_time
-        # * Fail Condition - Clamp Command not ACKed
-        if time_since > clamp_command_ack_timeout:
+        # * Fail Condition - Clamp Command not ACKed in time
+        if message.ms_since_send > CLAMP_COMMAND_ACK_TIMEOUT * 1000:
             logger_exe.warning("RoboticClampSync Movement (%s) stopped because ACK not received from clamp controller within %s sec." %
-                            (movement.movement_id, clamp_command_ack_timeout))
+                            (movement.movement_id, CLAMP_COMMAND_ACK_TIMEOUT))
             stop_clamps()
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Clamp Controller no ACK, cannot continue.']))
             return False
@@ -686,7 +659,6 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     # * Monitoring robot and clamp the same time.
     active_traj_point_n = 0
-    model.ros_clamps.clamps_status_count = 0
     total_traj_points = len(movement.trajectory.points)
 
     def robot_movement_completed():
@@ -710,7 +682,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             active_traj_point_n += 1
 
         # * Monitor if the Clamp have started running
-        if clamp_command.status != ROS_COMMAND.RUNNING:
+        if clamp_command.status == ROS_COMMAND.NOT_STARTED:
             if current_milli_time() - message.send_time > CLAMP_START_RUNNING_TIMEOUT * 1000:
                 logger_exe.warning("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
                 stop_clamps()
@@ -801,7 +773,6 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
 
 
     command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
-    model.ros_clamps.last_command_success = None
     message = model.ros_clamps.send(command)
 
     # Wait for Clamp Controller to ACK
@@ -820,16 +791,11 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         # * Monitor if the command succeeded
         if command.status == ROS_COMMAND.SUCCEED:
             logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
-            for clamp_id in clamp_ids:
-                logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
-
             return True
 
         # * Monitor if the command failed
         if command.status == ROS_COMMAND.FAILED:
             logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
-            for clamp_id in clamp_ids:
-                logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
             return False
 
         # * Monitor if the Clamp Controller is still alive
@@ -991,7 +957,7 @@ def execute_jog_robot_to_config(guiref, model, config: Configuration, message: s
     """
     # Construct and send rrc command
     model.run_status = RunStatus.JOGGING
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
     ext_values = to_millimeters(config.prismatic_values)
     joint_values = to_degrees(config.revolute_values)
 
@@ -1011,7 +977,7 @@ def execute_jog_robot_to_config(guiref, model, config: Configuration, message: s
         logger_exe.warning("UI stop button pressed before MoveToJoints in JogRobotToState Movement is completed.")
 
     # Trigger update Status
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
     return future.done
 
 
@@ -1148,12 +1114,12 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
 
     """
     model.run_status = RunStatus.JOGGING
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
 
     def failure_routine(message):
         logger_exe.info(message)
         model.run_status = RunStatus.STOPPED
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
         return False
 
     # * Enable softmove state.
@@ -1213,7 +1179,7 @@ def execute_shake_gantry(guiref, model: RobotClampExecutionModel, shake_amount, 
         return failure_routine("execute_shake_gantry() stopped beacause robot_softmove_blocking() failed.")
 
     model.run_status = RunStatus.STOPPED
-    q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+    q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
 
     return True
 

@@ -51,7 +51,7 @@ def create_ui_ros(root, q: Queue):
     def on_robot_ros_connect_button_click(event=None):
         logger_ui.info("Button Pressed: Connect to Robot ROS Host")
         ip = robot_ip_entrybox.get()
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_ROBOT_CONNECT, ip=ip))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_ROBOT_CONNECT, ip=ip))
 
     tk.Label(frame, text="ROS Robot Host IP Address: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -64,7 +64,7 @@ def create_ui_ros(root, q: Queue):
 
     def on_open_settings_button_click(event=None):
         logger_ui.info("Button Pressed: Open Settings")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_OPEN_SETTING))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_OPEN_SETTING))
     tk.Button(frame, text="Speed Settings",
               command=on_open_settings_button_click).pack(side=tk.LEFT)
     # Status Label
@@ -82,7 +82,7 @@ def create_ui_ros(root, q: Queue):
     def on_clamp_ros_connect_button_click(event=None):
         logger_ui.info("Button Pressed: Connect to Clamps ROS Host")
         ip = clamp_ip_entrybox.get()
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_CLAMP_CONNECT, ip=ip))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_CLAMP_CONNECT, ip=ip))
 
     tk.Label(frame, text="ROS Clamp Host IP Address: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -123,11 +123,11 @@ def create_ui_process(root, q: Queue):
             logger_ui.info(
                 "User Selected %s from Load Json File Dialog." % filename)
             q.put(SimpleNamespace(
-                type=BackgroundCommand.MODEL_LOAD_PROCESS, json_path=filename))
+                type=ProcessControllerBackgroundCommand.MODEL_LOAD_PROCESS, json_path=filename))
 
     def on_load_ext_movement_button_click(event=None):
         logger_ui.info("Button Pressed: Load Ext Movement")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_LOAD_EXT_MOVEMENT))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_LOAD_EXT_MOVEMENT))
 
     tk.Label(frame, text="Process JSON: ", font=tk.font_key,
              anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -145,7 +145,7 @@ def create_ui_process(root, q: Queue):
     # DropDown List of all beams
     def on_goto_beam_combobox_selected(eventObject):
         beam_id = ui_handles['goto_beam_combobox'].get()
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_TREEVIEW_GOTO_BEAM, beam_id=beam_id))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_TREEVIEW_GOTO_BEAM, beam_id=beam_id))
 
     ui_handles['goto_beam_value'] = tk.StringVar(value="")
     goto_beam_combobox = ttk.Combobox(frame, width=27, textvariable=ui_handles['goto_beam_value'])
@@ -155,13 +155,13 @@ def create_ui_process(root, q: Queue):
 
     # Test button
     def on_test_button0_click(event=None,):
-        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id=0))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.TEST, id=0))
     tk.Button(frame, text="TestButton0",
               command=on_test_button0_click).pack(side=tk.LEFT, padx=6)
 
     # Test button
     def on_test_button1_click(event=None,):
-        q.put(SimpleNamespace(type=BackgroundCommand.TEST, id=1))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.TEST, id=1))
     tk.Button(frame, text="TestButton1 - Show JSON",
               command=on_test_button1_click).pack(side=tk.LEFT, padx=6)
 
@@ -224,28 +224,28 @@ def create_ui_execution(root, q: Queue):
     # Button Handle
     def on_run_button_click(event=None):
         logger_ui.info("Button Pressed: RUN")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_RUN))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_RUN))
     ui_handles['run_button'] = tk.Button(
         left_frame, text="RUN", command=on_run_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['run_button'].pack(side=tk.TOP)
 
     def on_step_button_click(event=None):
         logger_ui.info("Button Pressed: STEP")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_STEP))
     ui_handles['step_button'] = tk.Button(
         left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['step_button'].pack(side=tk.TOP)
 
     def on_step_from_point_button_click(event=None):
         logger_ui.info("Button Pressed: STEP FRON POINT")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STEP_FROM_POINT))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_STEP_FROM_POINT))
     ui_handles['step_from_pt_button'] = tk.Button(
         left_frame, text="STEP from Pt", command=on_step_from_point_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['step_from_pt_button'].pack(side=tk.TOP)
 
     def on_stop_button_click(event=None):
         logger_ui.info("Button Pressed: STOP")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_STOP))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_STOP))
     ui_handles['stop_button'] = tk.Button(
         left_frame, text="STOP", command=on_stop_button_click, font=tk.big_button_font, width=15, state="disabled")
     ui_handles['stop_button'].pack(side=tk.TOP)
@@ -259,7 +259,7 @@ def create_ui_execution(root, q: Queue):
 
     def on_confirm_button_click(event=None):
         logger_ui.info("Button Pressed: Confirm")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_CONFIRM))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_CONFIRM))
         confirm_button.config(state="disabled")
 
     ui_handles['confirm_button_text'] = tk.StringVar(value="Confirm?")
@@ -304,25 +304,25 @@ def create_ui_execution(root, q: Queue):
 
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO Start State")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_START_STATE))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_GOTO_START_STATE))
     tk.Button(right_frame, text="GOTO Start State", command=on_goto_start_state_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_goto_end_state_button_click(event=None):
         logger_ui.info("Button Pressed: GOTO END State")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_GOTO_END_STATE))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_GOTO_END_STATE))
     tk.Button(right_frame, text="GOTO End State", command=on_goto_end_state_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_print_summary_button_click(event=None):
         logger_ui.info("Button Pressed: Print Selected Beam Action Summary")
-        q.put(SimpleNamespace(type=BackgroundCommand.PRINT_ACTION_SUMMARY))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.PRINT_ACTION_SUMMARY))
     tk.Button(right_frame, text="Print Selected Beam Action Summary",
               command=on_print_summary_button_click, font=tk.small_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_shake_gantry_button_click(event=None):
         logger_ui.info("Button Pressed: Shake Gantry")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_SHAKE_GANTRY_POPUP))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_SHAKE_GANTRY_POPUP))
     tk.Button(right_frame, text="SHAKE Gantry", command=on_shake_gantry_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
@@ -360,13 +360,13 @@ def create_ui_execution(root, q: Queue):
 
     def on_goto_start_state_button_click(event=None):
         logger_ui.info("Button Pressed: Robot Soft Mode")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_ENABLE))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_SOFTMODE_ENABLE))
     tk.Button(right_frame_2, text="Robot Soft Mode", command=on_goto_start_state_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
     def on_goto_end_state_button_click(event=None):
         logger_ui.info("Button Pressed: Robot Hard Mode")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_SOFTMODE_DISABLE))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_SOFTMODE_DISABLE))
     tk.Button(right_frame_2, text="Robot Hard Mode", command=on_goto_end_state_button_click,
               font=tk.big_button_font, width=20).pack(fill=tk.X, side=tk.TOP)
 
@@ -397,7 +397,7 @@ def create_ui_offset(root, q: Queue):
 
     def on_compute_visual_alignment_click(event=None):
         logger_ui.info("Button Pressed: Compute Gantry Correction")
-        q.put(SimpleNamespace(type=BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION))
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION))
     tk.Button(frame, text="Compute Gantry Correction", command=on_compute_visual_alignment_click,
               font=tk.small_button_font, width=25).pack(fill=tk.X, side=tk.LEFT)
 

@@ -53,6 +53,13 @@ class RosMessage(object):
             return None
 
     @property
+    def ms_since_send(self):
+        if self.send_time is not None:
+            return current_milli_time() - self.send_time
+        else:
+            return None
+
+    @property
     def command_data(self):
         if self.command is not None:
             return self.command.data
@@ -127,15 +134,14 @@ class RemoteClampFunctionCall(Ros):
         self.sequence_id = 0
 
         self.sent_messages = {}  # type: Dict[int, RosMessage]
+        self.last_sent_message = None # type: RosMessage
         self.external_status_change_callback = status_change_callback
-        self.last_command_success = None
         self.markers_transformation = {}
 
         # * Keeps the status update send back fom the Clamp Controller
         self.last_received_message_time = 0
         self.last_status_time = 0       # Keep track of the (local) time stamp of last status update
         self.clamps_status_count = 0
-        self.clamps_status = {}         # Raw Clamp Status sent back from the Clamp Controller
         self.sync_move_inaction = None  # Flag whether the last sent sync_move command is successful
 
         def clamp_message_ack_callback(received_roslibpy_message):
@@ -185,6 +191,10 @@ class RemoteClampFunctionCall(Ros):
             self.last_received_message_time = current_milli_time()
             logger.info('Message %i StatusUpdate Received. status = %s ' % (sequence_id, message.command.status))
 
+            # Call external callback
+            if self.external_status_change_callback is not None:
+                self.external_status_change_callback(message)
+
         # Setup listener topic.
         self.status_listener = roslibpy.Topic(self, '/clamp_command_status', 'std_msgs/String')
         self.status_listener.subscribe(status_callback)
@@ -207,6 +217,7 @@ class RemoteClampFunctionCall(Ros):
 
         # * Keep track of the sent message
         self.sent_messages[message.sequence_id] = message
+        self.last_sent_message = message
         logger.info("Message %i Sent. sendable_dict=%s" %(message.sequence_id, message.to_sendable_dict()))
         self.sequence_id += 1  # Increment message counter
         return message

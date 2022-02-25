@@ -38,15 +38,6 @@ In all situations, the monitoring script need to raise a error message fast enou
 """
 
 
-def interpolate(start, end, total_steps, current_step):
-    if current_step == 0:
-        return start
-    elif current_step == total_steps:
-        return end
-    elif (current_step > 0) & (current_step < total_steps):
-        return [((e - s)/total_steps*current_step + s) for s, e in zip(start, end)]
-    else:
-        raise IndexError("current_step must be within 0 to total_steps")
 
 CLAMP_START_RUNNING_TIMEOUT = 0.7
 CLAMP_CONTROLLER_ALIVE_TIMEOUT = 3.5
@@ -64,7 +55,7 @@ if __name__ == '__main__':
 
     ip = "192.168.0.120"
     ros_clamps = RemoteClampFunctionCall(ip)
-    clamps_id = ['s1']
+    clamp_id = 's1'
     try:
         # This runs in a separate thread
         ros_clamps.run(timeout=2)
@@ -78,12 +69,8 @@ if __name__ == '__main__':
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
     logger_exe.info("Sending send")
     command_sent_time = time.time()
-    velocity = 0.8
-    position = 10
-    power_percentage=80
-    allowable_target_deviation=5
-    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id in clamps_id]
-    clamp_command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
+
+    clamp_command = ROS_SCREWDRIVER_GRIPPER_COMMAND(clamp_id, True)
     message = ros_clamps.send(clamp_command)
     clamp_command_ack_timeout = 0.5 # ! Timeout for Clamp Controller to ACK command
 

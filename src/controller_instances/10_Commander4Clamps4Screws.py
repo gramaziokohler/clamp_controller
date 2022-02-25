@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel
-from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gui
+from clamp_controller.CommanderGUI import ClampControllerBackgroundCommand, create_commander_gui
 from clamp_controller.SerialCommander import RosSerialCommander
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
 

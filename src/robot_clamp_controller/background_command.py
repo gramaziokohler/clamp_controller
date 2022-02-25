@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
 
-class BackgroundCommand(Enum):
+class ProcessControllerBackgroundCommand(Enum):
     UI_ROBOT_CONNECT = auto()
     UI_CLAMP_CONNECT = auto()
 

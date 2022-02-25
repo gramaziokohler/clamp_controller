@@ -29,7 +29,6 @@ class SerialCommander(object):
         self.logger = logging.getLogger("app.cmd")
         self.status_update_high_freq: bool = False  # Flag that indicate update status interval to be in high frequency (when clamps are in motion)
         self.sync_move_inaction = False             # Flag to indicate sync move in action and monitor if any clamp stopped.
-        self.last_command_success = True
         pass
 
     @property

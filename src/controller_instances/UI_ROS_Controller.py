@@ -36,7 +36,7 @@ logger_ros = logging.getLogger("app.ros")
 logger_sync = logging.getLogger("app.sync")
 # Initialize multi-tasking variables.
 last_status_update_time = 0
-
+MIN_ALLOWABLE_TARGET_DEVIATION = 0.1
 
 def background_thread(guiref, commander: RosSerialCommander, q):
     # This is a sudo time-split multi-task with priority execution.
@@ -84,13 +84,13 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
         msg = q.get(timeout=0.1)
         if hasattr(msg, 'type'):
             # * Handelling UI_SERIAL_CONNECT
-            if msg.type == BackgroundCommand.UI_SERIAL_CONNECT:
+            if msg.type == ClampControllerBackgroundCommand.UI_SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
                 return True
 
             # * Handelling UI_ROS_CONNECT
-            if msg.type == BackgroundCommand.UI_ROS_CONNECT:
+            if msg.type == ClampControllerBackgroundCommand.UI_ROS_CONNECT:
                 logger_ctr.info("Command Received to Connect to ROS at %s" % msg.ip)
                 # Disconnect from previous host
                 if (commander.ros_client is not None) and (commander.ros_client.is_connected):
@@ -134,7 +134,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_CLAMP_GOTO
-            if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -146,7 +146,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_SCREWDRIVER_GOTO
-            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_GOTO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_SCREWDRIVER_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -158,26 +158,33 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_STOP
-            if msg.type == BackgroundCommand.CMD_STOP:
+            if msg.type == ClampControllerBackgroundCommand.CMD_STOP:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
 
+                # * Fail last running ros command
+                command = commander.get_running_command()
                 commander.fail_last_running_command()
 
-                # Instruct commander to send command
+                # * Stop active clamps first
+                if isinstance(command, RequireMonitoring):
+                    active_tool_ids = command.get_monitoring_tool_ids()
+                    active_clamps = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in active_tool_ids]
+                    result = commander.stop_clamps(active_clamps)
+                    logger_ctr.info("Stop command sent to active Devices %s, result = %s" % (active_tool_ids, result))
+
+                # * Stop other clamps
                 all_clamps = commander.clamps.values()
                 selected_clamps = get_checkbox_selected_clamps(guiref, commander)
                 clamps_to_communicate = [clamp for clamp in all_clamps if clamp in selected_clamps]
                 result = commander.stop_clamps(clamps_to_communicate)
                 logger_ctr.info("Stop command sent to Selected Devices %s, result = %s" % (clamps_to_communicate, result))
-                clamps_to_communicate = [clamp for clamp in all_clamps if clamp not in selected_clamps]
-                result = commander.stop_clamps(clamps_to_communicate)
-                logger_ctr.info("Stop command sent to UnSelected Devices %s, result = %s" % (clamps_to_communicate, result))
+
                 return True
 
             # * Handelling CMD_HOME (Generic for both Screwdriver and Clamps)
-            if msg.type == BackgroundCommand.CMD_HOME:
+            if msg.type == ClampControllerBackgroundCommand.CMD_HOME:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -188,7 +195,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_CLAMP_VELO
-            if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -201,7 +208,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_SCREWDRIVER_VELO
-            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_VELO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_SCREWDRIVER_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -214,7 +221,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_SCREWDRIVER_GRIPPER
-            if msg.type == BackgroundCommand.CMD_SCREWDRIVER_GRIPPER:
+            if msg.type == ClampControllerBackgroundCommand.CMD_SCREWDRIVER_GRIPPER:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -230,7 +237,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 return True
 
             # * Handelling CMD_POWER
-            if msg.type == BackgroundCommand.CMD_POWER:
+            if msg.type == ClampControllerBackgroundCommand.CMD_POWER:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -270,6 +277,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
 
             # Send RUNNING status to ros
             commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.RUNNING)
+            logger_ctr.info("ROS_VEL_GOTO_COMMAND Command Start: %s" % (command.data))
 
             # Set Power
             if command.power_percentage is not None:
@@ -288,7 +296,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
 
             if success:
                 # Log
-                logger_ctr.info("ROS_VEL_GOTO_COMMAND Command Executed: Instructions = %s, results = Success" % (clamps_pos_velo))
+                logger_ctr.info("ROS_VEL_GOTO_COMMAND Command Success")
             else:
                 # Log
                 clamps = [commander.clamps[clamp_id] for clamp_id, position, velocity in clamps_pos_velo]
@@ -304,6 +312,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
             commander.fail_last_running_command()
             commander.last_ros_command = command
             commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.RUNNING)
+            logger_ctr.info("ROS_STOP_COMMAND Command Start: %s" % (command.data))
 
             if not commander.is_connected:
                 logger_ctr.warning("ROS_STOP_COMMAND: Connect to Serial Radio first")
@@ -323,6 +332,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
             commander.fail_last_running_command()
             commander.last_ros_command = command
             commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.RUNNING)
+            logger_ctr.info("ROS_STOP_ALL_COMMAND Command Start")
 
             if not commander.is_connected:
                 logger_ctr.warning("ROS_STOP_ALL_COMMAND: Connect to Serial Radio first")
@@ -338,7 +348,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
             command = msg  # type: ROS_SCREWDRIVER_GRIPPER_COMMAND # Type Hint Helper
             commander.fail_last_running_command()
             commander.last_ros_command = command
-            commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.RUNNING)
+
 
             if not commander.is_connected:
                 logger_ctr.warning("ROS_SCREWDRIVER_GRIPPER_COMMAND: Connect to Serial Radio first")
@@ -357,12 +367,9 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.FAILED)
                 return True
 
-            # Keep track if the command is completed successful.
-            # This will be set back to true by the sync watcher
-            # commander.last_command_success = False
-
             # Instruct commander to send command
             commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.RUNNING)
+            logger_ctr.info("ROS_SCREWDRIVER_GRIPPER_COMMAND Command Start: %s" % (command.data))
             successes = commander.set_screwdriver_gripper([device_to_communicate], command.extend)
 
             if all(successes):
@@ -509,6 +516,7 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
         # Send stop command to all acive clamps, messaging the failed_clamp_id last
         clamps_to_stop = [clamp_id for clamp_id in clamp_ids if clamp_id is not clamp]
         clamps_to_stop.append(failed_clamp_id)
+        logger_sync.warning("check_sync_move failed. Stopping all clamps: %s" % clamps_to_stop)
         # Try to message them until they are all successful, max try 5 times
         for _ in range(5):
             successes = commander.stop_clamps(clamps_to_stop)
@@ -519,9 +527,13 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
     # * Check every clamp that should be moving
     for clamp, target_jaw_position, velo in clamp_pos_velo:
         # * Compute target success based on allowable_target_deviation
-        target_reached = abs(target_jaw_position - clamp.currentJawPosition) < command.allowable_target_deviation
+        target_deviation = abs(target_jaw_position - clamp.currentJawPosition)
+        allowable_deviation = max(abs(command.allowable_target_deviation), MIN_ALLOWABLE_TARGET_DEVIATION)
+        target_reached = target_deviation < allowable_deviation
         if clamp.isMotorRunning == False and target_reached == False:
-            logger_sync.warning("Sync Move Check Failed: %s stopped at %0.1fmm before reaching target %0.1fmm. Initializing stop all clamps." % (clamp, clamp.currentJawPosition, target_jaw_position))
+            logger_sync.warning("Sync Move Check Failed: %s stopped at %0.1fmm before reaching target %0.1fmm. Devaition %0.1fmm > %0.1fmm Initializing stop all clamps." %
+                (clamp, clamp.currentJawPosition, target_jaw_position, target_deviation, allowable_deviation)
+                )
             # Stop all clamps involved in the sync move
             fail_routine(clamp)
             return False
@@ -549,7 +561,7 @@ def check_screwdriver_gripper_move(commander: RosSerialCommander, command: ROS_S
     - If the gripper status (Extended or Retracted) match the
     This command is not a syncronized move, so there is no syncronized stop when the gripper fails.
     """
-    if command.status == ROS_COMMAND.RUNNING:
+    if command.status != ROS_COMMAND.RUNNING:
         return False
 
     active_clamp_status_timeout_ms = 3500

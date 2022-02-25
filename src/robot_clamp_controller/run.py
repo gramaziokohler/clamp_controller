@@ -62,7 +62,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
         if hasattr(msg, 'type'):
 
             # Handelling MODEL_LOAD_PROCESS upon closure of dialog
-            if msg.type == BackgroundCommand.MODEL_LOAD_PROCESS:
+            if msg.type == ProcessControllerBackgroundCommand.MODEL_LOAD_PROCESS:
                 logger_bg.info(
                     "Relaying BackgroundCommand: MODEL_LOAD_PROCESS")
                 guiref['root'].wm_state('iconic')
@@ -76,7 +76,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 enable_run_buttons(guiref)
                 guiref['root'].wm_state('zoomed')
 
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_OPEN_SETTING):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_OPEN_SETTING):
                 # model.open_setting_file()
                 path = model.settings_file_path_default()
                 master = guiref['root']
@@ -89,7 +89,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_bg.info("Settings Saved")
 
             # Handle UI_TREEVIEW_GOTO_BEAM
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_TREEVIEW_GOTO_BEAM, check_loaded_process=True, check_status_is_stopped=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_TREEVIEW_GOTO_BEAM, check_loaded_process=True, check_status_is_stopped=True):
                 tree = guiref['process']['tree']
                 # Screw tree to the bottom and scrow back up ensures the item of interest
                 # is on the first row in the treeview
@@ -101,11 +101,11 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_bg.warning("Cannot find Treeview item: %s" % msg.beam_id)
 
             # Handle UI_UPDATE_STATUS
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_UPDATE_STATUS):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_UPDATE_STATUS):
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_RUN
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_RUN,
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_RUN,
                             check_loaded_process=True, check_robot_connection=True):
                 # Change Status
                 model.run_status = RunStatus.RUNNING
@@ -119,7 +119,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 # Dont do anyhting if program is already running
 
             # Handelling UI_STEP
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STEP,
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_STEP,
                             check_loaded_process=True, check_robot_connection=True):
                 # Change Status
                 model.run_status = RunStatus.STEPPING_FORWARD
@@ -132,7 +132,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_STEP_FROM_POINT
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STEP_FROM_POINT,
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_STEP_FROM_POINT,
                             check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
 
                 # Retrive movement and check if state is available
@@ -166,7 +166,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_STOP
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_STOP):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_STOP):
                 if model.run_status != RunStatus.STOPPED:
                     model.run_status = RunStatus.STOPPED
                 else:
@@ -180,12 +180,12 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_CONFIRM
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_CONFIRM):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_CONFIRM):
                 model.operator_confirm = True
                 ui_update_run_status(guiref, model)
 
             # Handelling UI_ROBOT_CONNECT
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_ROBOT_CONNECT):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_ROBOT_CONNECT):
                 # Connect to new ROS host
                 guiref['ros']['robot_status'].set("Connecting to Robot Host")
                 if model.connect_ros_robots(msg.ip, q):
@@ -197,7 +197,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_ctr.info("Robot Host connection not successful")
 
             # Handelling UI_CLAMP_CONNECT
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_CLAMP_CONNECT):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_CLAMP_CONNECT):
                 # Connect to new ROS host
                 guiref['ros']['clamp_status'].set("Connecting to Clamp Hose")
                 if model.connect_ros_clamps(msg.ip, partial(ros_clamps_callback, guiref, model, q)):
@@ -209,19 +209,19 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                     logger_ctr.info("Clamp Host connection not successful")
 
             # Handelling PRINT_ACTION_SUMMARY
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.PRINT_ACTION_SUMMARY):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.PRINT_ACTION_SUMMARY):
                 beam_id = treeview_get_selected_item_beam_id(guiref)
                 if beam_id is not None:
                     model.process.get_movement_summary_by_beam_id(beam_id)
 
             # Handelling UI_LOAD_EXT_MOVEMENT
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_LOAD_EXT_MOVEMENT, check_loaded_process=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_LOAD_EXT_MOVEMENT, check_loaded_process=True):
                 movements_modified = model.load_external_movements()
                 for movement in movements_modified:
                     update_treeview_row(guiref, model, movement)
 
             # Handelling UI_GOTO_START_STATE
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_START_STATE,
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_GOTO_START_STATE,
                             check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -239,7 +239,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.start()
 
             # Handelling UI_GOTO_END_STATE
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_GOTO_END_STATE,
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_GOTO_END_STATE,
                             check_loaded_process=True, check_robot_connection=True, check_status_is_stopped=True, check_selected_is_movement=True):
                 # Retrive movement and check if state is available
                 tree_row_id = treeview_get_selected_id(guiref)
@@ -257,11 +257,11 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.start()
 
             # Handelling UI_SHAKE_GANTRY_POPUP
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SHAKE_GANTRY_POPUP):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_SHAKE_GANTRY_POPUP):
                 dialog = ShakeGantryPopup(guiref, model, q)
 
             # Handelling UI_SHAKE_GANTRY
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SHAKE_GANTRY, check_robot_connection=True, check_status_is_stopped=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_SHAKE_GANTRY, check_robot_connection=True, check_status_is_stopped=True):
                 shake_amount = msg.shake_amount
                 shake_speed = msg.shake_speed
                 shake_repeat = msg.shake_repeat
@@ -270,31 +270,31 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.start()
 
             # Handelling UI_SOFTMODE_ENABLE
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
                 jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref)), daemon=True)
                 jog_thread.name = "Jog SoftMove Thread"
                 jog_thread.start()
 
             # Handelling UI_SOFTMODE_DISABLE
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_SOFTMODE_DISABLE, check_robot_connection=True, check_status_is_stopped=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_SOFTMODE_DISABLE, check_robot_connection=True, check_status_is_stopped=True):
                 jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, False), daemon=True)
                 jog_thread.name = "Jog SoftMove Thread"
                 jog_thread.start()
 
             # Handelling UI_COMPUTE_VISUAL_CORRECTION
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION, check_selected_is_movement=True):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_COMPUTE_VISUAL_CORRECTION, check_selected_is_movement=True):
                 tree_row_id = treeview_get_selected_id(guiref)
                 movement = model.movements[tree_row_id]  # type: RoboticMovement
                 compute_visual_correction(guiref, model, movement)
 
             # Handelling TEST
-            if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST):
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.TEST):
                 tree_row_id = treeview_get_selected_id(guiref)
                 if msg.id == 0:
                     movement = model.movements[tree_row_id]
                     test0(msg, guiref, model, movement)
                 elif msg.id == 1:
-                    if bg_cmd_check(msg, guiref, model, BackgroundCommand.TEST, check_selected_is_movement=True):
+                    if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.TEST, check_selected_is_movement=True):
                         movement = model.movements[tree_row_id]
                         show_movement_json_popup(guiref, model, movement)
                 else:
@@ -314,7 +314,7 @@ def robot_softmove_blocking_thread(model: RobotClampExecutionModel, enable: bool
 
 
 def bg_cmd_check(msg, guiref, model: RobotClampExecutionModel,
-                 target_bg_command: BackgroundCommand,
+                 target_bg_command: ProcessControllerBackgroundCommand,
                  check_loaded_process=False,
                  check_robot_connection=False,
                  check_status_is_stopped=False,
@@ -413,7 +413,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             if not confirm:
                 logger_run.info(
                     "Operator stop not confirmed before movement. Run Thread Ended.")
-                q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+                q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
                 break
 
         # Execution
@@ -426,7 +426,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             if not confirm:
                 logger_run.info(
                     "Operator stop not confirmed after movement. Run Thread Ended.")
-                q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+                q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
                 break
 
         # Terminate if execution is not success, do not increment pointer.
@@ -434,7 +434,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
             model.run_status = RunStatus.ERROR
             logger_run.info(
                 "Execution Error. Program Stopped. Run Thread Ended.")
-            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+            q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
             break
 
         # Move program pointer to next movement
@@ -447,7 +447,7 @@ def program_run_thread(guiref, model: RobotClampExecutionModel, q):
         # Status note that the RUN Thread is Stopped
         if model.run_status == RunStatus.STOPPED:
             logger_run.info("Program Stopped. Run Thread Ended.")
-            q.put(SimpleNamespace(type=BackgroundCommand.UI_UPDATE_STATUS))
+            q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
             break
 
 
@@ -508,8 +508,11 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
 
     # Clamps Status
     if model.ros_clamps is not None:
-        if model.ros_clamps.sent_messages is not []:
-            command = model.ros_clamps.sent_messages[-1].command
+        if model.ros_clamps.last_sent_message is not None:
+            command = model.ros_clamps.last_sent_message.command
+            guiref['exe']['clamps_last_cmd_success'].set(command.__class__.__name__)
+            guiref['exe']['clamps_last_cmd_success_label'].config(bg="gray")
+
             if command.status == ROS_COMMAND.RUNNING:
                 guiref['exe']['clamps_running'].set("Running")
                 guiref['exe']['clamps_running_label'].config(bg="green")
@@ -522,9 +525,6 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
             if command.status == ROS_COMMAND.FAILED:
                 guiref['exe']['clamps_running'].set("Failed")
                 guiref['exe']['clamps_running_label'].config(bg="red")
-
-            guiref['exe']['clamps_last_cmd_success'].set(command.__class__.__name__)
-            guiref['exe']['clamps_last_cmd_success_label'].config(bg="gray")
 
 
 def test0(msg, guiref, model, movement):
@@ -582,7 +582,7 @@ if __name__ == "__main__":
         logger_ctr.info(
             "Command Line contain -f. Load Json File at %s." % args.f)
         q.put(SimpleNamespace(
-            type=BackgroundCommand.MODEL_LOAD_PROCESS, json_path=args.f))
+            type=ProcessControllerBackgroundCommand.MODEL_LOAD_PROCESS, json_path=args.f))
 
     # Start the TK GUI Thread
     tk.mainloop()

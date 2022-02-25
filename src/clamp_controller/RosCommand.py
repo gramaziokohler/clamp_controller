@@ -101,7 +101,7 @@ class ROS_STOP_ALL_COMMAND(ROS_COMMAND):
 
 
 class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND, RequireMonitoring):
-    def __init__(self, tool_id: str, extend: bool):
+    def __init__(self, tool_id: str = None, extend: bool = None):
         super().__init__()
         self.tool_id = tool_id
         self.extend = extend
@@ -109,15 +109,15 @@ class ROS_SCREWDRIVER_GRIPPER_COMMAND(ROS_COMMAND, RequireMonitoring):
     @property
     def data(self):
         data = super(ROS_SCREWDRIVER_GRIPPER_COMMAND, self).data
-        data['tools_id'] = self.tools_id
+        data['tool_id'] = self.tool_id
         data['extend'] = self.extend
         return data
 
     @data.setter
     def data(self, data):
         super(ROS_SCREWDRIVER_GRIPPER_COMMAND, type(self)).data.fset(self, data)
-        self.tools_id = data.get('tools_id', [])
-        self.extend = data.get('extend', [])
+        self.tool_id = data.get('tool_id', None)
+        self.extend = data.get('extend', None)
 
     def get_monitoring_tool_ids(self) -> List[str]:
         return [self.tool_id]
