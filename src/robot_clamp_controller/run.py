@@ -478,8 +478,11 @@ def ros_clamps_callback(guiref=None, model: RobotClampExecutionModel = None, q=N
     # we convert the ROS Command to a BackgroundCommand and place it in background command queue
     if message is None:
         return
+
     ui_update_run_status(guiref, model)
-    # logger_ros.info("Message from clamp: active = %s, last_cmd_success=%s" % (model.ros_clamps.sync_move_inaction, model.ros_clamps.last_command_success))
+
+    # ! At the moment there is no command coming back from the ClampController that needs to be placed
+    # ! in the queue. The ros_clamp object (RemoteClampFunctionCall) can already update its own clamps status
 
 
 def ui_update_run_status(guiref, model: RobotClampExecutionModel):
@@ -505,25 +508,23 @@ def ui_update_run_status(guiref, model: RobotClampExecutionModel):
 
     # Clamps Status
     if model.ros_clamps is not None:
-        if model.ros_clamps.sync_move_inaction is not None:
-            # Only updates if the status is not the initial None value
-            if model.ros_clamps.sync_move_inaction:
+        if model.ros_clamps.sent_messages is not []:
+            command = model.ros_clamps.sent_messages[-1].command
+            if command.status == ROS_COMMAND.RUNNING:
                 guiref['exe']['clamps_running'].set("Running")
                 guiref['exe']['clamps_running_label'].config(bg="green")
-
-                guiref['exe']['clamps_last_cmd_success'].set(" - ")
-                guiref['exe']['clamps_last_cmd_success_label'].config(bg="gray")
-
-            else:
-                guiref['exe']['clamps_running'].set("Stopped")
+            if command.status == ROS_COMMAND.NOT_STARTED:
+                guiref['exe']['clamps_running'].set("NotStarted")
+                guiref['exe']['clamps_running_label'].config(bg="orange")
+            if command.status == ROS_COMMAND.SUCCEED:
+                guiref['exe']['clamps_running'].set("Succeed")
                 guiref['exe']['clamps_running_label'].config(bg="gray")
+            if command.status == ROS_COMMAND.FAILED:
+                guiref['exe']['clamps_running'].set("Failed")
+                guiref['exe']['clamps_running_label'].config(bg="red")
 
-                if model.ros_clamps.last_command_success:
-                    guiref['exe']['clamps_last_cmd_success'].set("Success")
-                    guiref['exe']['clamps_last_cmd_success_label'].config(bg="green")
-                else:
-                    guiref['exe']['clamps_last_cmd_success'].set("Failed")
-                    guiref['exe']['clamps_last_cmd_success_label'].config(bg="red")
+            guiref['exe']['clamps_last_cmd_success'].set(command.__class__.__name__)
+            guiref['exe']['clamps_last_cmd_success_label'].config(bg="gray")
 
 
 def test0(msg, guiref, model, movement):

@@ -33,9 +33,9 @@ class RosMessage(object):
 
     def __init__(self, sequence_id: int) -> None:
         self.sequence_id = sequence_id
-        self.send_time = None  # type: int
+        self.send_time = None  # type: int # ms
         self.command = None  # type: ROS_COMMAND
-        self.reply_receive_time = None  # type: int
+        self.reply_receive_time = None  # type: int # ms
         # self.reply_type = None # type: str
         # self.reply_data = None # type: Dict
 

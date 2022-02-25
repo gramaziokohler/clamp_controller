@@ -50,6 +50,8 @@ before returning.
 INTERMEDIATE_ZONE = rrc.Zone.Z5
 FINAL_ZONE = rrc.Zone.FINE
 
+CLAMP_START_RUNNING_TIMEOUT = 0.7
+CLAMP_CONTROLLER_ALIVE_TIMEOUT = 3.5
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
@@ -318,10 +320,12 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
     # * Send command to Clamp Controller, wait for ROS controller to ACK
     model.ros_clamps.last_command_success = None
     if movement.digital_output == DigitalOutput.OpenGripper:
+        # * Open Gripper
         message = model.ros_clamps.send(ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, False))
         model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 2
         logger_exe.info("Sending ROS_SCREWDRIVER_GRIPPER_COMMAND (Extend = False) Movement (%s)" % (movement.movement_id))
     elif movement.digital_output == DigitalOutput.CloseGripper:
+        # * Close Gripper
         message = model.ros_clamps.send(ROS_SCREWDRIVER_GRIPPER_COMMAND(movement.tool_id, True))
         logger_exe.info("Sending ROS_SCREWDRIVER_GRIPPER_COMMAND (Extend = True) Movement (%s)" % (movement.movement_id))
         model.ros_clamps.clamps_status[movement.tool_id]['raw_gripper_status'] = 1
@@ -331,7 +335,7 @@ def execute_robotic_digital_output_screwdriver(guiref, model: RobotClampExecutio
 
     while (True):
         # Sucess Condition - ACK Received
-        if message.done == True:
+        if message.acked:
             logger_exe.info("ROS_GRIPPER command ACK received.")
             break
 
@@ -631,8 +635,8 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
     logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (clamp_ids, position))
     clamp_command_sent_time = time.time()
-    command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
-    message = model.ros_clamps.send(command)
+    clamp_command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
+    message = model.ros_clamps.send(clamp_command)
     clamp_command_ack_timeout = 0.5  # ! Timeout for Clamp Controller to ACK command
 
     while (True):
@@ -684,17 +688,9 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
     active_traj_point_n = 0
     model.ros_clamps.clamps_status_count = 0
     total_traj_points = len(movement.trajectory.points)
-    CLAMP_FIRST_STATUS_TIMEOUT = 0.7
-    CLAMP_STATUS_TIMEOUT = 3.5
 
     def robot_movement_completed():
         return futures[-1].done
-
-    def clamp_movement_complete():
-        return (not model.ros_clamps.sync_move_inaction) and model.ros_clamps.last_command_success
-
-    def clamp_movement_failed():
-        return (not model.ros_clamps.sync_move_inaction) and (not model.ros_clamps.last_command_success)
 
     while(True):
         # Monitor the finished robot points
@@ -713,32 +709,32 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
             active_traj_point_n += 1
 
-        # * Monitor if the Clamp Controller send back first status update within timeout
-        if model.ros_clamps.clamps_status_count == 0:
-            if time.time() - clamp_command_sent_time > CLAMP_FIRST_STATUS_TIMEOUT:
-                logger_exe.warn("Sync Lost: First clamp status did not arrive within %s sec" % CLAMP_FIRST_STATUS_TIMEOUT)
+        # * Monitor if the Clamp have started running
+        if clamp_command.status != ROS_COMMAND.RUNNING:
+            if current_milli_time() - message.send_time > CLAMP_START_RUNNING_TIMEOUT * 1000:
+                logger_exe.warn("Sync Lost: Clamp status did not start running within %s sec" % CLAMP_START_RUNNING_TIMEOUT)
                 stop_clamps()
                 stop_robots()
-                model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['"Sync Lost: First clamp status did not arrive.']))
+                model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['"Sync Lost: Clamp status did not start running.']))
                 model.ros_robot.send(rrc.Stop())
                 return False
 
-        # * Monitor if the Clamp Controller's second and subsequent status update age is within max_age
-        if model.ros_clamps.clamps_status_count > 0:
-            if time.time() - model.ros_clamps.last_status_time > CLAMP_STATUS_TIMEOUT:
-                logger_exe.warn("Sync Lost: Clamp status older than %s sec" % CLAMP_STATUS_TIMEOUT)
+        # * Monitor if the Clamp Controller is still alive
+        if clamp_command.status == ROS_COMMAND.RUNNING:
+            if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
+                logger_exe.warn("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
                 stop_clamps()
                 stop_robots()
-                model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp status older than timeout.']))
+                model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp Commander not alive.']))
                 model.ros_robot.send(rrc.Stop())
                 return False
 
         # * Monitor if the Clamp Controller reports a failed sync move.
-        if model.ros_clamps.clamps_status_count > 0 and clamp_movement_failed():
-            logger_exe.warn("Sync Lost: Clamp Commander Report SyncMove not in action.")
+        if clamp_command.status == ROS_COMMAND.FAILED:
+            logger_exe.warn("Sync Lost: Clamp Command Failed.")
             stop_robots()
             stop_clamps()
-            model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp Commander Report SyncMove not in action.']))
+            model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['Sync Lost: Clamp Command Failed.']))
             model.ros_robot.send(rrc.Stop())
             return False
 
@@ -761,7 +757,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
             return False
 
         # * Condition to exit loop when both clamps and robot are finished
-        if robot_movement_completed() and clamp_movement_complete():
+        if robot_movement_completed() and clamp_command.status == ROS_COMMAND.SUCCEED:
             logger_exe.info("RobClamp Sync Move Completed")
             model.ros_robot.send(rrc.CustomInstruction('r_A067_TPPlot', ['RobClamp Sync Move Completed']))
             break
@@ -810,39 +806,40 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
 
     # Wait for Clamp Controller to ACK
     while (True):
-        if message.done == True:
+        if message.acked:
             logger_exe.info("Clamp Jaw Movement (%s) with %s Started" % (movement.movement_id, clamp_ids))
             break
-        # # Check if the the reply is negative
-        # if model.ros_clamps.sync_move_inaction == False:
-        #     if model.ros_clamps.last_command_success == False:
-        #         logger_exe.warn("Clamp Jaw Movement (%s) stopped because clamp ACK is not success." % (movement.movement_id))
-        #         return False
-        # Check if user pressed stop button in UI
+
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warn("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
             model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
             return False
 
-    model.ros_clamps.sync_move_inaction = True
-    model.ros_clamps.last_command_success = False
     # Wait for clamp to complete
     while (True):
-        # Check if clamps are running or not
-        if not model.ros_clamps.sync_move_inaction:
-            if model.ros_clamps.last_command_success:
-                logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
-                for clamp_id in clamp_ids:
-                    logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
+        # * Monitor if the command succeeded
+        if command.status == ROS_COMMAND.SUCCEED:
+            logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
+            for clamp_id in clamp_ids:
+                logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
 
-                return True
-            else:
-                logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
-                for clamp_id in clamp_ids:
-                    logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
+            return True
+
+        # * Monitor if the command failed
+        if command.status == ROS_COMMAND.FAILED:
+            logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
+            for clamp_id in clamp_ids:
+                logger_exe.info("Clamp %s status: %s" % (clamp_id, model.ros_clamps.clamps_status[clamp_id]))
+            return False
+
+        # * Monitor if the Clamp Controller is still alive
+        if command.status == ROS_COMMAND.RUNNING:
+            if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
+                logger_exe.warn("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
+                model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
                 return False
 
-        # Check if user pressed stop button in UI
+        # * Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warn(
                 "UI stop button pressed before Robotic Clamp Jaw Movement (%s) is completed." % (movement.movement_id))
