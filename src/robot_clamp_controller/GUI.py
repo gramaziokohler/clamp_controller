@@ -165,6 +165,12 @@ def create_ui_process(root, q: Queue):
     tk.Button(frame, text="TestButton1 - Show JSON",
               command=on_test_button1_click).pack(side=tk.LEFT, padx=6)
 
+    # Test button
+    def on_restart_camera_click(event=None,):
+        q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_RESTART_CAMERA))
+    tk.Button(frame, text="Restart Docking Camera",
+              command=on_restart_camera_click).pack(side=tk.LEFT, padx=6)
+
     # Second Frame holds the treeview for process Movements and Actions List
     frame = ttk.Frame(root, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=1, side=tk.TOP, padx=6, pady=3)

@@ -15,6 +15,7 @@ class ProcessControllerBackgroundCommand(Enum):
     UI_GOTO_START_STATE = auto()
     UI_SHAKE_GANTRY = auto()
     UI_SHAKE_GANTRY_POPUP = auto()
+    UI_RESTART_CAMERA = auto()
     UI_GOTO_END_STATE = auto()
     UI_LOAD_EXT_MOVEMENT = auto()
     UI_OPEN_SETTING = auto()

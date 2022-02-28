@@ -421,7 +421,7 @@ def update_status(guiref, commander: RosSerialCommander):
         last_status_update_time = current_milli_time()
 
         # * Request a status update from clamp commander
-        if isinstance(commander.last_ros_command, RequireMonitoring):
+        if isinstance(commander.get_running_command(), RequireMonitoring):
             # * If a command is active, only the clamps in the command are polled.
             active_clamps = [commander.get_clamp_by_process_tool_id(tool_id) for tool_id in commander.last_ros_command.get_monitoring_tool_ids()]
             updated_clamps = commander.update_clamps_status(active_clamps, 1)

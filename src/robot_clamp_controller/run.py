@@ -269,6 +269,13 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
                 jog_thread.name = "Jogging Thread"
                 jog_thread.start()
 
+            # Handelling Restart Camera
+            if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_RESTART_CAMERA, check_robot_connection=True, check_status_is_stopped=True):
+                model.ros_robot.send(rrc.SystemSetDigital("doUnitR11Out1",0))
+                time.sleep(2)
+                model.ros_robot.send(rrc.SystemSetDigital("doUnitR11Out1",1))
+
+
             # Handelling UI_SOFTMODE_ENABLE
             if bg_cmd_check(msg, guiref, model, ProcessControllerBackgroundCommand.UI_SOFTMODE_ENABLE, check_robot_connection=True, check_status_is_stopped=True):
                 jog_thread = Thread(target=robot_softmove_blocking_thread, args=(model, True, get_soft_direction(guiref), get_stiffness_soft_dir(guiref), get_stiffness_nonsoft_dir(guiref)), daemon=True)
