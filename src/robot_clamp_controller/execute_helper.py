@@ -54,6 +54,18 @@ def robot_state_to_instruction(guiref, model: RobotClampExecutionModel, robot_co
     # Command to Move
     return rrc.MoveToJoints(joint_values, ext_values, speed, zone, feedback_level=feedback_level)
 
+
+def convert_movement_speed_type_to_power_poercentage(movement):
+    if movement.speed_type == "speed.assembly.screw_assemble":
+        power_percentage = 90
+    elif movement.speed_type == "speed.assembly.screw_retract":
+        power_percentage = 95
+    elif movement.speed_type == "speed.assembly.screw_tighten":
+        power_percentage = 80
+    else:
+        power_percentage = 99
+    return power_percentage
+
 ##################
 # Helper Functions
 ##################
@@ -90,6 +102,7 @@ def frame_to_millimeters(frame_in_meters: Frame):
     """
     new_point = Point(frame_in_meters.point.x * 1000.0, frame_in_meters.point.y * 1000.0, frame_in_meters.point.z * 1000.0, )
     return Frame(new_point, frame_in_meters.xaxis, frame_in_meters.yaxis)
+
 
 def compute_visual_correction(guiref, model: RobotClampExecutionModel, movement: RoboticMovement):
     """Compute the gantry offset from the visual offset in gui.

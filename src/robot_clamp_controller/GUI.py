@@ -233,7 +233,7 @@ def create_ui_execution(root, q: Queue):
         logger_ui.info("Button Pressed: STEP")
         q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_STEP))
     ui_handles['step_button'] = tk.Button(
-        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=15, state="disabled")
+        left_frame, text="STEP", command=on_step_button_click, font=tk.big_button_font, width=15, height=3, state="disabled")
     ui_handles['step_button'].pack(side=tk.TOP)
 
     def on_step_from_point_button_click(event=None):
@@ -264,7 +264,7 @@ def create_ui_execution(root, q: Queue):
 
     ui_handles['confirm_button_text'] = tk.StringVar(value="Confirm?")
     ui_handles['confirm_button'] = confirm_button = tk.Button(run_status_frame, textvariable=ui_handles['confirm_button_text'],
-                                                              command=on_confirm_button_click, font=tk.big_button_font, width=20, height=2, state="disabled", bg='grey')
+                                                              command=on_confirm_button_click, font=tk.big_button_font, width=20, height=3, state="disabled", bg='grey')
     ui_handles['confirm_button'].pack(side=tk.BOTTOM)
 
     robot_status_frame = ttk.Frame(frame, borderwidth=2, relief='solid', width=400)
@@ -682,24 +682,6 @@ class SettingsPopupWindow(object):
         self.top.destroy()
 
 
-class AlternativeStartPointWindow(object):
-    def __init__(self, master, max_number, current_number=None):
-
-        top = self.top = tk.Toplevel(master)
-        self.l = tk.Label(top, text="Which point to start from? [0 to %i]" % max_number)
-        self.l.pack()
-
-        self.e = tk.Entry(top)
-        self.e.pack(side=tk.LEFT, fill=tk.BOTH)
-        if current_number is not None:
-            self.e.insert(tk.END, str(current_number))
-        self.b = tk.Button(top, text='Go', command=self.cleanup)
-        self.b.pack()
-        self.value = None
-
-    def cleanup(self):
-        self.value = int(self.e.get())
-        self.top.destroy()
 
 
 if __name__ == "__main__":

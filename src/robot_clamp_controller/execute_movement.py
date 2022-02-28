@@ -97,6 +97,9 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     elif isinstance(movement, ClampsJawMovement):
         return execute_clamp_jaw_movement(guiref, model, movement)
 
+    elif isinstance(movement, ScrewdriverMovement):
+        return execute_screwdriver_movement(guiref, model, movement)
+
     elif isinstance(movement, RoboticDigitalOutput):
         tool_id = movement.tool_id  # type: str
         tool_type = type(model.process.tool(tool_id))
@@ -127,7 +130,7 @@ def execute_movement(guiref, model: RobotClampExecutionModel, movement: Movement
     # Catch all during Development
     else:
         execute_some_delay(model, movement)
-        logger_exe.warning("execution code for %s does not exist." % movement)
+        logger_exe.warning("execution code for %s - %s does not exist." % (movement.__class__.__name__, movement.tag))
         return False
 
 #####################################################
@@ -552,11 +555,12 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         return False
 
     # * Prepare Movement command parameters
+    tool_ids = None
     if type(movement) == RoboticClampSyncLinearMovement:
-        clamp_ids = movement.clamp_ids
+        tool_ids = movement.clamp_ids
         position = movement.jaw_positions[0]
     elif type(movement) == RobotScrewdriverSyncLinearMovement:
-        clamp_ids = movement.screwdriver_ids
+        tool_ids = movement.screwdriver_ids
         position = movement.screw_positions[0]
 
     velocity = model.settings[movement.speed_type]
@@ -582,7 +586,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
 
     def stop_clamps():
         """Function to stop all active clamps"""
-        model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
+        model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
 
     def stop_robots():
         """Function to stop active robot"""
@@ -596,19 +600,12 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         return False
 
     # * Retrive screwdriver motion parameters
-    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id in clamp_ids]
-    if movement.speed_type == "speed.assembly.screw_assemble":
-        power_percentage = 90
-    elif movement.speed_type == "speed.assembly.screw_retract":
-        power_percentage = 95
-    elif movement.speed_type == "speed.assembly.screw_tighten":
-        power_percentage = 80
-    else:
-        power_percentage = 99
+    clamps_pos_velo = [(tool_id, position, velocity) for tool_id in tool_ids]
+    power_percentage = convert_movement_speed_type_to_power_poercentage(movement)
     allowable_target_deviation = movement.allowable_target_deviation
 
     # * Send movement to Clamp Controller, wait for ROS controller to ACK
-    logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (clamp_ids, position))
+    logger_exe.info("Sending ROS_VEL_GOTO_COMMAND to clamp for %s to %smm Started" % (tool_ids, position))
 
     clamp_command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
     message = model.ros_clamps.send(clamp_command)
@@ -628,7 +625,7 @@ def execute_robotic_clamp_sync_linear_movement(guiref, model: RobotClampExecutio
         # * Fail Condition - UI Cancel
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warning("RoboticClampSync Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
-            model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
+            model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
             return False
         time.sleep(0.05)
 
@@ -756,19 +753,12 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         return False
 
     # Remove clamp prefix:
-    clamp_ids = movement.clamp_ids
+    tool_ids = movement.clamp_ids
     positions = movement.jaw_positions
     velocity = model.settings[movement.speed_type]
 
-    clamps_pos_velo = [(clamp_id, position, velocity) for clamp_id, position in zip(clamp_ids, positions)]
-    if movement.speed_type == "speed.assembly.screw_assemble":
-        power_percentage = 90
-    elif movement.speed_type == "speed.assembly.screw_retract":
-        power_percentage = 95
-    elif movement.speed_type == "speed.assembly.screw_tighten":
-        power_percentage = 80
-    else:
-        power_percentage = 99
+    clamps_pos_velo = [(tool_id, position, velocity) for tool_id, position in zip(tool_ids, positions)]
+    power_percentage = convert_movement_speed_type_to_power_poercentage(movement)
     allowable_target_deviation = movement.allowable_target_deviation
 
 
@@ -778,12 +768,12 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
     # Wait for Clamp Controller to ACK
     while (True):
         if message.acked:
-            logger_exe.info("Clamp Jaw Movement (%s) with %s Started" % (movement.movement_id, clamp_ids))
+            logger_exe.info("Clamp Jaw Movement (%s) with %s Started" % (movement.movement_id, tool_ids))
             break
 
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warning("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
-            model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
+            model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
             return False
 
     # Wait for clamp to complete
@@ -802,16 +792,71 @@ def execute_clamp_jaw_movement(guiref, model: RobotClampExecutionModel, movement
         if command.status == ROS_COMMAND.RUNNING:
             if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
                 logger_exe.warning("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
-                model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
+                model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
                 return False
 
         # * Check if user pressed stop button in UI
         if model.run_status == RunStatus.STOPPED:
             logger_exe.warning(
                 "UI stop button pressed before Robotic Clamp Jaw Movement (%s) is completed." % (movement.movement_id))
-            model.ros_clamps.send(ROS_STOP_COMMAND(clamp_ids))
+            model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
             return False
 
+
+def execute_screwdriver_movement(guiref, model: RobotClampExecutionModel, movement: ScrewdriverMovement):
+    if (model.ros_clamps is None) or not model.ros_clamps.is_connected:
+        logger_exe.info(
+            "Clamp movement cannot start because Clamp ROS is not connected")
+        return False
+
+    # Remove clamp prefix:
+    tool_ids = movement.tool_ids
+    positions = movement.target_positions
+    velocity = model.settings[movement.speed_type]
+
+    clamps_pos_velo = [(tool_id, position, velocity) for tool_id, position in zip(tool_ids, positions)]
+    allowable_target_deviation = movement.allowable_target_deviation
+    power_percentage = convert_movement_speed_type_to_power_poercentage(movement)
+
+    command = ROS_VEL_GOTO_COMMAND(clamps_pos_velo, power_percentage, allowable_target_deviation)
+    message = model.ros_clamps.send(command)
+
+    # Wait for Clamp Controller to ACK
+    while (True):
+        if message.acked:
+            logger_exe.info("Clamp Jaw Movement (%s) with %s Started" % (movement.movement_id, tool_ids))
+            break
+
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warning("Clamp Jaw Movement (%s) stopped by user before clamp ACK." % (movement.movement_id))
+            model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
+            return False
+
+    # Wait for clamp to complete
+    while (True):
+        # * Monitor if the command succeeded
+        if command.status == ROS_COMMAND.SUCCEED:
+            logger_exe.info("Clamp Jaw Movement (%s) completed." % movement.movement_id)
+            return True
+
+        # * Monitor if the command failed
+        if command.status == ROS_COMMAND.FAILED:
+            logger_exe.info("Clamp Jaw Movement (%s) stopped or jammed." % movement.movement_id)
+            return False
+
+        # * Monitor if the Clamp Controller is still alive
+        if command.status == ROS_COMMAND.RUNNING:
+            if model.ros_clamps.last_received_message_age_ms > CLAMP_CONTROLLER_ALIVE_TIMEOUT * 1000:
+                logger_exe.warning("Sync Lost: Clamp Commander not alive for more than %s sec" % CLAMP_CONTROLLER_ALIVE_TIMEOUT)
+                model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
+                return False
+
+        # * Check if user pressed stop button in UI
+        if model.run_status == RunStatus.STOPPED:
+            logger_exe.warning(
+                "UI stop button pressed before Robotic Clamp Jaw Movement (%s) is completed." % (movement.movement_id))
+            model.ros_clamps.send(ROS_STOP_COMMAND(tool_ids))
+            return False
 
 def execute_operator_add_jog_offset_movement(guiref, model: RobotClampExecutionModel, movement: OperatorAddJogOffset):
     """Performs OperatorAddJogOffset Movement by stopping execution and ask user to jog (using the robot TP).

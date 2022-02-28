@@ -232,6 +232,8 @@ class RobotClampExecutionModel(object):
 def _mark_movements_as_softmove(process):
     # type: (RobotClampAssemblyProcess) -> None
     """Marks selected movements of the assembly process as soft move."""
+    count_RoboticClampSyncLinearMovement = 0
+    count_RobotScrewdriverSyncLinearMovement = 0
     for i, action in enumerate(process.actions):
         for j, movement in enumerate(action.movements):
             # Default
@@ -239,22 +241,14 @@ def _mark_movements_as_softmove(process):
             # Softmove cases
             if isinstance(movement, RoboticClampSyncLinearMovement):
                 movement.softmove = True
-                logger_model.info("Marked as Soft Move: %s : %s (RoboticClampSyncLinearMovement)" % (movement.movement_id, movement.tag))
+                count_RoboticClampSyncLinearMovement += 1
             # Softmove cases
             if isinstance(movement, RobotScrewdriverSyncLinearMovement):
                 movement.softmove = True
-                logger_model.info("Marked as Soft Move: %s : %s (RobotScrewdriverSyncLinearMovement)" % (movement.movement_id, movement.tag))
+                count_RobotScrewdriverSyncLinearMovement += 1
 
-            #
-            # if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.assembly.noclamp':
-            #     movement.softmove = True
-            #     logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
-
-            # # The linear movement where the tool changer is docking
-            # if isinstance(movement, RoboticLinearMovement) and movement.speed_type == 'speed.toolchange.approach.clamp_on_structure':
-            #     if movement.tag.startswith("Linear Approach 2 of 2") or movement.tag.startswith("Linear Advance to mate toolchanger"):
-            #         movement.softmove = True
-            #         logger_model.info("Marked as Soft Move: %s : %s " % (movement.movement_id, movement.tag))
+    logger_model.info("%i RoboticClampSyncLinearMovement Marked as Soft Move" % (count_RoboticClampSyncLinearMovement))
+    logger_model.info("%i RobotScrewdriverSyncLinearMovement Marked as Soft Move" % (count_RobotScrewdriverSyncLinearMovement))
 
 
 def _mark_movements_operator_stop(process):

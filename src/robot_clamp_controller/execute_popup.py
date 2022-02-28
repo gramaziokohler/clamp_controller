@@ -4,6 +4,7 @@ from robot_clamp_controller.execute_helper import *
 
 # from integral_timber_joints.process.movement import *
 
+
 class VisualOffsetPopup(object):
 
     def __init__(self, guiref,  model: RobotClampExecutionModel, movement: OperatorAddVisualOffset):
@@ -48,6 +49,7 @@ class VisualOffsetPopup(object):
         self.model.run_status = RunStatus.STOPPED
         self.accpet = False
         self.window.destroy()
+
 
 class ShakeGantryPopup(object):
 
@@ -94,6 +96,7 @@ class ShakeGantryPopup(object):
         self.q.put(SimpleNamespace(type=ProcessControllerBackgroundCommand.UI_UPDATE_STATUS))
         self.window.destroy()
 
+
 class MovementJsonPopup(object):
 
     def __init__(self, guiref,  model: RobotClampExecutionModel, movement: Movement):
@@ -118,3 +121,23 @@ class MovementJsonPopup(object):
 
     def close(self):
         self.window.destroy()
+
+
+class AlternativeStartPointWindow(object):
+    def __init__(self, master, max_number, current_number=None):
+
+        top = self.top = tk.Toplevel(master)
+        self.l = tk.Label(top, text="Which point to start from? [0 to %i]" % max_number)
+        self.l.pack()
+
+        self.e = tk.Entry(top, font=tk.big_button_font)
+        self.e.pack(side=tk.LEFT, fill=tk.BOTH)
+        if current_number is not None:
+            self.e.insert(tk.END, str(current_number))
+        self.b = tk.Button(top, text='.  Go  .', command=self.cleanup, font=tk.big_button_font, height=3)
+        self.b.pack()
+        self.value = None
+
+    def cleanup(self):
+        self.value = int(self.e.get())
+        self.top.destroy()
