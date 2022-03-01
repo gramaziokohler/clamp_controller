@@ -144,7 +144,7 @@ def execute_background_commands(guiref, model: RobotClampExecutionModel, q):
 
                 suggest_starting_step = None
                 if hasattr(movement, "last_completed_point"):
-                    suggest_starting_step = movement.last_completed_point
+                    suggest_starting_step = min(movement.last_completed_point + 1 , len(movement.trajectory.points) - 1)
                 popup = AlternativeStartPointWindow(guiref['root'], max_start_number, suggest_starting_step)
                 guiref['root'].wait_window(popup.top)
                 n = popup.value
