@@ -336,6 +336,31 @@ class SerialCommander(object):
             successes.append(success)
         return successes
 
+    def override_clamp_current_position(self, clamp: ClampModel, position: float, retry: int = 3) -> bool:
+        """ Override the current position of a clamp / screwdriver
+        """
+
+        # Convert units
+        step = int(position * clamp.StepPerMM)
+
+        # Send message to clamp
+        message = "t" + str(step)
+        response = self.message_clamp(clamp, message, retry=retry)
+        success = response is not None
+
+        self.logger.info("override_clamp_current_position(%s,%s), message = %s, success = %s" % (clamp, step, message, success))
+        return success
+
+    def override_clamps_current_position(self, clamps: List[ClampModel], position: float, retry: int = 3) -> List[bool]:
+        """Override the current position of multiple clamp / screwdriver
+        Return a list of boolean values whether the command is successfully ACKed.
+        """
+        successes = []
+        for clamp in clamps:
+            success = self.override_clamp_current_position(clamp, position, retry=retry)
+            successes.append(success)
+        return successes
+
     def set_screwdriver_gripper(self, devices: List[ScrewdriverModel], extend: bool, retry: int = 3) -> List[bool]:
         """Move Screwdriver Gripper to Extend or Retract State Location
         """

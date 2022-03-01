@@ -1,7 +1,7 @@
 import logging
 import tkinter as tk
 import tkinter.font as tkFont
-from enum import Enum
+from enum import Enum, auto
 from queue import Queue
 from tkinter import ttk
 from typing import List, Tuple
@@ -17,18 +17,19 @@ logger_ui = logging.getLogger("app.UI")
 
 class ClampControllerBackgroundCommand(Enum):
     # Misc UI Control
-    UI_SERIAL_CONNECT = 1
-    UI_ROS_CONNECT = 2
-    LOGGING = 3
+    UI_SERIAL_CONNECT = auto()
+    UI_ROS_CONNECT = auto()
+    LOGGING = auto()
     # Manually issued movement command
-    CMD_POWER = 10
-    CMD_HOME = 11
-    CMD_STOP = 12
-    CMD_CLAMP_GOTO = 13
-    CMD_CLAMP_VELO = 14
-    CMD_SCREWDRIVER_GOTO = 15
-    CMD_SCREWDRIVER_VELO = 16
-    CMD_SCREWDRIVER_GRIPPER = 17
+    CMD_POWER = auto()
+    CMD_HOME = auto()
+    CMD_STOP = auto()
+    CMD_CLAMP_GOTO = auto()
+    CMD_CLAMP_VELO = auto()
+    CMD_SCREWDRIVER_GOTO = auto()
+    CMD_SCREWDRIVER_VELO = auto()
+    CMD_SCREWDRIVER_OVERRIDE_CURRENT_POS = auto()
+    CMD_SCREWDRIVER_GRIPPER = auto()
 
 
 def create_commander_gui(root, q: Queue, clamps):
@@ -178,7 +179,7 @@ def create_ui_control(root, q: Queue):
         logger_ui.info("Button Pressed: Clamp Go to Position %s" % position)
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_CLAMP_GOTO, position=position))
 
-    tk.Label(frame, text="Clamp: Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text="Clamp: Goto Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
     tk.Button(frame, text="101mm", command=lambda: on_clamp_goto_button_click(101)).pack(side=tk.LEFT)
     tk.Button(frame, text="102mm", command=lambda: on_clamp_goto_button_click(102)).pack(side=tk.LEFT)
     tk.Button(frame, text="110mm", command=lambda: on_clamp_goto_button_click(110)).pack(side=tk.LEFT)
@@ -212,12 +213,12 @@ def create_ui_control(root, q: Queue):
     frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    # Buttons
+    # Buttons - Screwdriver Go To Postion
     def on_screwdriver_goto_button_click(position):
         logger_ui.info("Button Pressed: Screwdriver Go to Position %s" % position)
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_SCREWDRIVER_GOTO, position=position))
 
-    tk.Label(frame, text="Screwdriver: Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
+    tk.Label(frame, text="Screwdriver: Goto Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y)
     tk.Button(frame, text="0mm", command=lambda: on_screwdriver_goto_button_click(0)).pack(side=tk.LEFT)
     tk.Button(frame, text="5mm", command=lambda: on_screwdriver_goto_button_click(5)).pack(side=tk.LEFT)
     tk.Button(frame, text="50mm", command=lambda: on_screwdriver_goto_button_click(50)).pack(side=tk.LEFT)
@@ -230,6 +231,7 @@ def create_ui_control(root, q: Queue):
     tk.Entry(frame, textvariable=ui_handles['custom_pos'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_screwdriver_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
 
+    # Buttons - Screwdriver Set Velocity
     def on_screwdriver_velo_button_click(velocity):
         logger_ui.info("Button Pressed: Set Velocity %s" % velocity)
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_SCREWDRIVER_VELO, velocity=velocity))
@@ -245,6 +247,17 @@ def create_ui_control(root, q: Queue):
     tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
 
+    # Buttons - Screwdriver Override current Position
+    def on_screwdriver_set_pos_button_click(position):
+        logger_ui.info("Button Pressed: Override current Position %s" % position)
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_SCREWDRIVER_OVERRIDE_CURRENT_POS, position=position))
+
+    tk.Label(frame, text="Override Current Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    ui_handles['custom_vel'] = tk.StringVar(value="0")
+    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (override)", command=lambda: on_screwdriver_set_pos_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+
+    # Buttons - Screwdriver Gripper Extend Retract
     def on_gripper_button_click(extend: bool):
         if extend:
             logger_ui.info("Button Pressed: Gripper Extend")
