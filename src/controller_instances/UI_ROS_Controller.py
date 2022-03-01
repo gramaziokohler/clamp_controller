@@ -513,12 +513,16 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
     clamp_pos_velo = [(commander.get_clamp_by_process_tool_id(clamp_id), p, v) for (clamp_id, p, v) in command.clamps_pos_velo]
 
     def fail_routine(failed_clamp_id):
+        # Report current positions of the devices during the fail
+        for clamp, target_jaw_position, _ in clamp_pos_velo:
+            logger_sync.info("Device - %s current_pos = %0.1fmm (target = %0.1fmm)" % (clamp.process_tool_id, clamp.currentJawPosition, target_jaw_position))
+
         # Send stop command to all acive clamps, messaging the failed_clamp_id last
         clamps_to_stop = [clamp_id for clamp_id in clamp_ids if clamp_id is not clamp]
         clamps_to_stop.append(failed_clamp_id)
-        logger_sync.warning("check_sync_move failed. Stopping all clamps: %s" % clamps_to_stop)
         # Try to message them until they are all successful, max try 5 times
-        for _ in range(5):
+        for i in range(5):
+            logger_sync.warning("check_sync_move failed. Stopping all clamps: %s Attempt %s" % (clamps_to_stop, i+1))
             successes = commander.stop_clamps([commander.get_clamp_by_process_tool_id(clamp_id) for clamp_id in clamps_to_stop])
             if all(successes):
                 break
