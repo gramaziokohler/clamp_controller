@@ -519,7 +519,7 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
         logger_sync.warning("check_sync_move failed. Stopping all clamps: %s" % clamps_to_stop)
         # Try to message them until they are all successful, max try 5 times
         for _ in range(5):
-            successes = commander.stop_clamps(clamps_to_stop)
+            successes = commander.stop_clamps([commander.get_clamp_by_process_tool_id(clamp_id) for clamp_id in clamps_to_stop])
             if all(successes):
                 break
         commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.FAILED)
@@ -535,12 +535,12 @@ def check_sync_move(commander: RosSerialCommander, command: ROS_VEL_GOTO_COMMAND
                 (clamp, clamp.currentJawPosition, target_jaw_position, target_deviation, allowable_deviation)
                 )
             # Stop all clamps involved in the sync move
-            fail_routine(clamp)
+            fail_routine(clamp.process_tool_id)
             return False
         if current_milli_time() - clamp._state_timestamp > active_clamp_status_timeout_ms:
             logger_sync.warning("Sync Move Failed: %s lost contact (timeout = %s ms)" % (clamp, active_clamp_status_timeout_ms))
             # Stop all clamps involved in the sync move
-            fail_routine(clamp)
+            fail_routine(clamp.process_tool_id)
             return False
 
     # * Success if all clamps reached target or stopped
