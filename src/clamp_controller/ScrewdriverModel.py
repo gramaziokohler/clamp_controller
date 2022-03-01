@@ -231,14 +231,12 @@ class ScrewdriverModel(object):
 
     def __str__(self):
         # Readable
-        return "Clamp %s" % self.receiver_address
-        # if self.currentMotorPosition is None: return "ClampModel Object Address=%s (Not Connected)" % self.receiver_address
-        # homed_string = "Homed" if self.ishomed else "Not-Homed"
-        # return "ClampModel Object Address=%s BatteryLevel=%s%% Postion=%4.2fmm %s"  % (self.receiver_address, self.batteryPercentage, self.currentJawPosition, homed_string)
+        return "Screwdriver %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
 
     def __repr__(self):
         # unambiguous
-        return "Clamp %s" % self.receiver_address
+        return "Screwdriver %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
+
 
 
 g_status_dict = {

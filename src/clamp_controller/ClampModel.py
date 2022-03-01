@@ -187,14 +187,11 @@ class ClampModel(object):
 
     def __str__(self):
         # Readable
-        return "Clamp %s" % self.receiver_address
-        # if self.currentMotorPosition is None: return "ClampModel Object Address=%s (Not Connected)" % self.receiver_address
-        # homed_string = "Homed" if self.ishomed else "Not-Homed"
-        # return "ClampModel Object Address=%s BatteryLevel=%s%% Postion=%4.2fmm %s"  % (self.receiver_address, self.batteryPercentage, self.currentJawPosition, homed_string)
+        return "Clamp %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
 
     def __repr__(self):
         # unambiguous
-        return "Clamp %s" % self.receiver_address
+        return "Clamp %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
 
 
 if __name__ == "__main__":
