@@ -193,9 +193,9 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
     # Open Gripper Valve
     if movement.digital_output == DigitalOutput.OpenGripper:
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doUnitR11ValveA2', 0, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveA2', 1, feedback_level=1)))
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doUnitR11ValveB2', 1, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveB2', 0, feedback_level=1)))
 
         # Set Grip Load to zero
         future_results.append(model.ros_robot.send(
@@ -206,9 +206,9 @@ def execute_robotic_digital_output(guiref, model: RobotClampExecutionModel, move
     if movement.digital_output == DigitalOutput.CloseGripper:
         # Digital Output
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doUnitR11ValveA2', 1, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveA2', 0, feedback_level=1)))
         future_results.append(model.ros_robot.send(
-            rrc.SetDigital('doUnitR11ValveB2', 0, feedback_level=1)))
+            rrc.SetDigital('doUnitR11ValveB2', 1, feedback_level=1)))
 
         # Set Grip Load if the gripper closes on a beam
         if movement.beam_id is not None:
