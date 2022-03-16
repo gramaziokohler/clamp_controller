@@ -96,10 +96,16 @@ class RobotClampExecutionModel(object):
             'speed.transit.rapid': 800,
             'speed.toolchange.approach.withtool': 20,
             'speed.toolchange.approach.notool': 40,
-            'speed.toolchange.approach.clamp_on_structure': 5,
             'speed.toolchange.retract.withtool': 20,
             'speed.toolchange.retract.notool': 40,
             'speed.toolchange.retract.clamp_on_structure': 5,
+            'speed.toolchange.post_retract.withtool': 80,
+            'speed.toolchange.pre_approach.withtool': 80,
+            'speed.docking.approach.clamp_on_structure': 5,
+            'speed.docking.approach.screwdriver_on_structure': 5,
+            'speed.assembly.screw_assemble': 0.7,
+            'speed.assembly.screw_tighten': 0.7,
+            'speed.assembly.screw_retract': 0.8,
             'speed.assembly.inclamp': 50,   # Sliding beam into clamp.
             'speed.assembly.noclamp': 20,   # Simply putting it down
             'speed.assembly.clamping': 2,  #
