@@ -558,7 +558,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
     # Initialize Logger
-    initialize_logging("RobotClampExecution." +
+    initialize_logging("ProcessExeController." +
                        datetime.date.today().strftime("%Y-%m-%d") + ".debug.log",
                        console_level=logging.INFO,
                        log_file_level=logging.DEBUG)
