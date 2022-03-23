@@ -98,8 +98,8 @@ class ScrewdriverModel(object):
     @property
     def currentGripperPosition(self) -> Tuple[int, int]:
         """Returns the Two Gripper Position in mm """
-        p2 = None if self._raw_motor2_pos is None else self._raw_motor2_pos / self.StepPerMM
-        p3 = None if self._raw_motor3_pos is None else self._raw_motor3_pos / self.StepPerMM
+        p2 = None if self._raw_motor2_pos is None else self._raw_motor2_pos / self.GripperStepPerMM
+        p3 = None if self._raw_motor3_pos is None else self._raw_motor3_pos / self.GripperStepPerMM
         return (p2, p3)
 
     @property
@@ -134,7 +134,7 @@ class ScrewdriverModel(object):
 
     @property
     def gripper_is_moving(self):
-        return self._raw_gripper_status in [1,2]
+        return self._raw_gripper_status in [1,2,7,8,9]
 
     @property
     def gripper_move_failed(self):
@@ -247,6 +247,9 @@ g_status_dict = {
     4: 'Retracted',
     5: 'ExtendFail',
     6: 'RetractFail',
+    7: 'ExtendCatchup',
+    8: 'RetractCatchup',
+    9: 'Homing',
 }
 
 if __name__ == "__main__":
