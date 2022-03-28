@@ -47,7 +47,7 @@ before returning.
 # TASK PERS tooldata t_A067_Tool_PG1000:=[TRUE,[[0,0,0],[1,0,0,0]],[10.72,[0,0,105],[1,0,0,0],0,0,0]];
 # TASK PERS tooldata t_A067_Tool_PG500:=[TRUE,[[0,0,0],[1,0,0,0]],[9.04,[0,0,110],[1,0,0,0],0,0,0]];
 # TASK PERS tooldata t_A067_Tool_CL3:=[TRUE,[[0,0,0],[1,0,0,0]],[7.99,[-30,4,73],[1,0,0,0],0,0,0]];
-INTERMEDIATE_ZONE = rrc.Zone.Z5
+INTERMEDIATE_ZONE = rrc.Zone.Z1
 FINAL_ZONE = rrc.Zone.FINE
 
 # TIMEOUT values in seconds
@@ -363,9 +363,7 @@ def execute_robotic_free_movement(guiref, model: RobotClampExecutionModel, movem
     will return False.
     """
 
-    INTERMEDIATE_ZONE = rrc.Zone.Z5
-    FINAL_ZONE = rrc.Zone.FINE
-    STEPS_TO_BUFFER = 3  # Number of steps to allow in the robot buffer
+    STEPS_TO_BUFFER = 5  # Number of steps to allow in the robot buffer
 
     if movement.trajectory is None:
         logger_exe.warning("Attempt to execute movement with no trajectory")

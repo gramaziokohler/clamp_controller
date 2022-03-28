@@ -12,6 +12,8 @@ logger_exe = logging.getLogger("app.exe")
 def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: Movement, guiref, point_n: int,
                                     apply_offset: bool = True,
                                     fine_zone_points: int = 1,
+                                    fine_zone = rrc.Zone.FINE,
+                                    intermediate_zone = rrc.Zone.Z1,
                                     feedback_level: rrc.FeedbackLevel = rrc.FeedbackLevel.DONE,
                                     ) -> rrc.MoveToJoints:
     """Create a rrc.MoveToJoints instruction for a trajectory point
@@ -21,15 +23,12 @@ def trajectory_point_to_instruction(model: RobotClampExecutionModel, movement: M
     # Retrive a specific point in the trajectory.
     point = movement.trajectory.points[point_n]
 
-    from robot_clamp_controller.execute_movement import (FINAL_ZONE,
-                                                         INTERMEDIATE_ZONE)
-
     # Speed and Zone
     speed = model.settings[movement.speed_type]
     if point_n < len(movement.trajectory.points) - fine_zone_points:
-        zone = INTERMEDIATE_ZONE
+        zone = intermediate_zone
     else:
-        zone = FINAL_ZONE
+        zone = fine_zone
 
     return robot_state_to_instruction(guiref, model, point, speed, zone, feedback_level)
 
