@@ -162,6 +162,11 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     tk.Button(frame, text="Stop", command=lambda: on_stop_button_click(clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
 
 
+    if isinstance(clamp, ClampModel):
+        def on_camera_reset_button_click(receiver_address: str):
+            logger_ui.info("Device Camera Reset Button Pressed (Not Implemented): %s" % receiver_address)
+            # q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CAM_RESET, receiver_address=receiver_address))
+        tk.Button(frame, text="Camera Reset", command=lambda: on_camera_reset_button_click(clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
 
     if isinstance(clamp, ScrewdriverModel):
         create_label_pair("grip", "grip")
