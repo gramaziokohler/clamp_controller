@@ -52,14 +52,6 @@
                 "--width", "8",
                 "--height", "6",
                 "--save_file", "cam1_70mm_1600_1200.yml"]
-        },
-        {
-            "name": "Clamp Controller Main with process",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/robot_clamp_controller/run.py",
-            "console": "integratedTerminal",
-            "args": ["-f", "C:\\Users\\leungp\\Documents\\GitHub\\integral_timber_joints\\external\\itj_design_study\\210419_HyparHut\\results\\Shelter_process.json"]
         }
     ]
 }
