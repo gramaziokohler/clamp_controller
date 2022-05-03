@@ -183,13 +183,40 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
 
                 return True
 
+            # * Handelling CMD_STOP_ONE (Generic for both Screwdriver and Clamps)
+            if msg.type == ClampControllerBackgroundCommand.CMD_STOP_ONE:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+
+                # Determine if the command is only for one device
+                clamps_to_communicate = []
+                if hasattr(msg, 'receiver_address'):
+                    receiver_address = msg.receiver_address
+                    if receiver_address in commander.clamps:
+                        clamps_to_communicate = [commander.clamps[receiver_address]]
+
+                # Instruct commander to send command
+                results = commander.stop_clamps(clamps_to_communicate)
+                logger_ctr.info("Stop command sent to %s, results = %s" % (clamps_to_communicate, results))
+                return True
+
             # * Handelling CMD_HOME (Generic for both Screwdriver and Clamps)
             if msg.type == ClampControllerBackgroundCommand.CMD_HOME:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
+
+                # Determine if the command is only for one device
+                clamps_to_communicate = []
+                if hasattr(msg, 'receiver_address'):
+                    receiver_address = msg.receiver_address
+                    if receiver_address in commander.clamps:
+                        clamps_to_communicate = [commander.clamps[receiver_address]]
+                if clamps_to_communicate == []:
+                    clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+
                 # Instruct commander to send command
-                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
                 results = commander.home_clamps(clamps_to_communicate)
                 logger_ctr.info("Home command sent to %s, results = %s" % (clamps_to_communicate, results))
                 return True
@@ -238,10 +265,20 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
-                # Instruct commander to send command
-                extend = msg.extend
-                devices_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+
+                # Determine if the command is only for one device
+                devices_to_communicate = []
+                if hasattr(msg, 'receiver_address'):
+                    receiver_address = msg.receiver_address # type: str
+                    if receiver_address in commander.clamps:
+                        devices_to_communicate = [commander.clamps[receiver_address]]
+                if devices_to_communicate == []:
+                    devices_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                # Filter to select only ScrewdriverModel
                 devices_to_communicate = [clamp for clamp in devices_to_communicate if clamp.__class__ == ScrewdriverModel]
+
+                # Instruct commander to send command
+                extend = msg.extend  # type: bool
                 results = commander.set_screwdriver_gripper(devices_to_communicate, extend)
                 if extend:
                     logger_ctr.info("Pin Gripper Extend sent to Screwdrivers %s, results = %s" % (devices_to_communicate, results))

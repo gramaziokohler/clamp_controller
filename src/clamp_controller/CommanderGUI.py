@@ -24,6 +24,7 @@ class ClampControllerBackgroundCommand(Enum):
     CMD_POWER = auto()
     CMD_HOME = auto()
     CMD_STOP = auto()
+    CMD_STOP_ONE = auto()
     CMD_CLAMP_GOTO = auto()
     CMD_CLAMP_VELO = auto()
     CMD_SCREWDRIVER_GOTO = auto()
@@ -150,9 +151,32 @@ def create_one_ui_status(root, q: Queue, clamp: ClampModel):
     create_label_pair("last_pos", "last_pos")
     create_label_pair("last_vel", "last_vel")
 
+    def on_home_button_click(receiver_address: str):
+        logger_ui.info("Device HOME Button Pressed: %s" % receiver_address)
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_HOME, receiver_address=receiver_address))
+    tk.Button(frame, text="Home", command=lambda: on_home_button_click(clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
+
+    def on_stop_button_click(receiver_address: str):
+        logger_ui.info("Device STOP Button Pressed: %s" % receiver_address)
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_STOP_ONE, receiver_address=receiver_address))
+    tk.Button(frame, text="Stop", command=lambda: on_stop_button_click(clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
+
+
+
     if isinstance(clamp, ScrewdriverModel):
         create_label_pair("grip", "grip")
         create_label_pair("g_status", "g_status")
+
+        def on_gripper_button_click(receiver_address: str, extend: bool):
+            if extend:
+                logger_ui.info("Screwdriver Gripper Extend Button Pressed: %s" % receiver_address)
+            else:
+                logger_ui.info("Screwdriver Gripper Retract Button Pressed: %s" % receiver_address)
+            q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_SCREWDRIVER_GRIPPER, extend=extend, receiver_address=receiver_address))
+
+        tk.Button(frame, text="Extend", command=lambda: on_gripper_button_click(extend=True, receiver_address=clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
+        tk.Button(frame, text="Retract", command=lambda: on_gripper_button_click(extend=False, receiver_address=clamp.receiver_address)).pack(side=tk.LEFT, padx=5)
+
     return ui_handles
 
 
