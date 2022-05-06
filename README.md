@@ -1,7 +1,7 @@
 # clamp_controller
 Python-based high-level controller to monitor and command a network of distributed clamps.
 
-This repo is part of the [Robotic Assembled Timber Structures with Integral Timber Joints](https://github.com/gramaziokohler/integral_timber_joints) project. 
+This repo is part of the [Robotic Assembled Timber Structures with Integral Timber Joints](https://github.com/gramaziokohler/integral_timber_joints) project.
 
 ## Repo folder structure
 
@@ -17,7 +17,7 @@ This repo is part of the [Robotic Assembled Timber Structures with Integral Timb
 
 Digital twin of a clamp. Contains all the properties (e.g. step/mm conversion, soft limit, address) of a clamp and the telemetry reading.
 
-Also contain functions to: 
+Also contain functions to:
 
 - Decode received telemetry
 
@@ -39,11 +39,11 @@ Functions to:
 
 **RosClampCommandListener**
 
-A class that maintains the connection with ROS via roslibpy and listens-for (and replies-to) commands received as a rostopic. 
+A class that maintains the connection with ROS via roslibpy and listens-for (and replies-to) commands received as a rostopic.
 
 **CommanderGUI**
 
-A long function that create the tkinter UI for monitoring and control. This UI 
+A long function that create the tkinter UI for monitoring and control. This UI
 
 Alternatively, it is possible to run the `SerialCommander` directly without UI, all the connections and settings can be accessed by code.
 
@@ -95,13 +95,14 @@ Multiple devices need to cooperate with each other during robotic execution. A n
 ```
 cd local_directory_for_log_files
 python local_path_to_repo\src\controller_instances\08_TokyoCommander_UI+ROS.py
+python -m controller_instances.10_Commander4Clamps4Screws
 ```
 
 UI like this should appear:
 
 ![UI_Tokyo_JustStarted](doc/UI_Tokyo_JustStarted.jpg)
 
-### Remote calling clamp functions 
+### Remote calling clamp functions
 
 To remotely call clamp functions from a separate python execution/process (e.g. [itj_process](https://github.com/gramaziokohler/itj_process) controllers), you need to import **RemoteClampFunctionCall**. The following things should be started before making calls:
 
@@ -115,13 +116,14 @@ Example code:
 # Connect to ROS via roslibpy
    hostip = '192.168.43.141'
    clamps_connection = RemoteClampFunctionCall(hostip)
-   
+
 # Command to send clamp to target (non-blocking)
-   clamps_connection.send_ROS_VEL_GOTO_COMMAND(100.0, 1.0)
+   clamps_connection.sendD(ROS_VEL_GOTO_COMMAND)
 # Command to send clamp to target (blocking)
-   success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(100.0, 1.0, 1000)
+   success = clamps_connection.send_and_wait(ROS_VEL_GOTO_COMMAND, 1000)
 # Command to stop clamps (non-blocking)
-   clamps_connection.send_ROS_STOP_COMMAND(['1','2'])
+self.
+   clamps_connection.send(ROS_STOP_COMMAND(['1','2']))
 ```
 
 Read the [RemoteClampFunctionCall.py](src\clamp_controller\RemoteClampFunctionCall.py) for available functions.

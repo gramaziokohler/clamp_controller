@@ -98,8 +98,8 @@ class ScrewdriverModel(object):
     @property
     def currentGripperPosition(self) -> Tuple[int, int]:
         """Returns the Two Gripper Position in mm """
-        p2 = None if self._raw_motor2_pos is None else self._raw_motor2_pos / self.StepPerMM
-        p3 = None if self._raw_motor3_pos is None else self._raw_motor3_pos / self.StepPerMM
+        p2 = None if self._raw_motor2_pos is None else self._raw_motor2_pos / self.GripperStepPerMM
+        p3 = None if self._raw_motor3_pos is None else self._raw_motor3_pos / self.GripperStepPerMM
         return (p2, p3)
 
     @property
@@ -133,6 +133,23 @@ class ScrewdriverModel(object):
         return self._isDirectionExtend
 
     @property
+    def gripper_is_moving(self):
+        return self._raw_gripper_status in [1,2,7,8,9]
+
+    @property
+    def gripper_move_failed(self):
+        return self._raw_gripper_status in [5,6]
+
+    @property
+    def gripper_extend_success(self):
+        return self._raw_gripper_status == 3
+
+    @property
+    def gripper_retract_success(self):
+        return self._raw_gripper_status == 4
+
+
+    @property
     def state_to_data(self):
         """Function to serialize the device state into a dictionary that is serializible and passable over ROS"""
         data = {}
@@ -143,6 +160,7 @@ class ScrewdriverModel(object):
         data['raw_statusCode'] = self._raw_statusCode
         data['raw_battery'] = self._raw_battery
         data['is_running'] = self.isMotorRunning
+        data['raw_gripper_status'] = self._raw_gripper_status
 
         return data
 
@@ -213,14 +231,12 @@ class ScrewdriverModel(object):
 
     def __str__(self):
         # Readable
-        return "Clamp %s" % self.receiver_address
-        # if self.currentMotorPosition is None: return "ClampModel Object Address=%s (Not Connected)" % self.receiver_address
-        # homed_string = "Homed" if self.ishomed else "Not-Homed"
-        # return "ClampModel Object Address=%s BatteryLevel=%s%% Postion=%4.2fmm %s"  % (self.receiver_address, self.batteryPercentage, self.currentJawPosition, homed_string)
+        return "Screwdriver %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
 
     def __repr__(self):
         # unambiguous
-        return "Clamp %s" % self.receiver_address
+        return "Screwdriver %s (addr=%s)" % (self.process_tool_id, self.receiver_address)
+
 
 
 g_status_dict = {
@@ -231,6 +247,9 @@ g_status_dict = {
     4: 'Retracted',
     5: 'ExtendFail',
     6: 'RetractFail',
+    7: 'ExtendCatchup',
+    8: 'RetractCatchup',
+    9: 'Homing',
 }
 
 if __name__ == "__main__":

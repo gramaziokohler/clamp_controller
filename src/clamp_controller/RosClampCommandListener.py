@@ -8,57 +8,88 @@
 import datetime
 import json
 import time
+import logging
+
+from typing import List, Dict, Tuple, Callable
 
 import roslibpy
 from roslibpy import Ros
+from clamp_controller.RosCommand import *
+from clamp_controller.RemoteClampFunctionCall import RosMessage
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
 
+logger = logging.getLogger("app.cmd_listener")
+
+
 class RosClampCommandListener(Ros):
 
-    def __init__(self, host, command_callback, is_secure=False):
-        from twisted.internet import reactor
-        reactor.timeout = lambda : 0.00001
-        Ros.__init__(self, host, 9090, is_secure)
-        self.command_callback = command_callback
-        # Setup replier topic.
-        self.replier = roslibpy.Topic(self, '/clamp_response', 'std_msgs/String')
-        self.replier.advertise()
+    def __init__(self, host, command_callback: Callable[[ROS_COMMAND, RosMessage], None], is_secure=False):
 
-        def receive_callback(message):
-            command_dict = json.loads(message['data'])
-            # Reply to the message.
-            reply_message = {'msg':'This is just ROS ack. Not necessary clamps moving.' }
-            reply_message['sequence_id'] = command_dict['sequence_id']
-            reply_message['timestamp'] = current_milli_time()
-            self.replier.publish(roslibpy.Message({'data': json.dumps(reply_message)}))
+        from twisted.internet import reactor
+        reactor.timeout = lambda: 0.00001
+        Ros.__init__(self, host, 9090, is_secure)
+
+        self.received_command_message_pairs = {}  # type: Dict[ROS_COMMAND, RosMessage]
+        self.command_callback = command_callback  # type: Callable[[ROS_COMMAND, RosMessage]]
+        self.last_message_sequence_id = 0  # type: int
+
+        # Setup replier topic.
+        self.message_ack_replier = roslibpy.Topic(self, '/clamp_message_ack', 'std_msgs/String')
+        self.message_ack_replier.advertise()
+
+        def clamp_command_receive_callback(received_roslibpy_message):
+            # * Reconstruct RosMessage
+            message = RosMessage.from_received_roslibpy_message(received_roslibpy_message)
+
+            # * Reconstruct Command
+            if message.command is None:
+                logger.warning("RosMessage received with no command. : %s" % message)
+
+            # Ack the message with a empty message but same id
+            ack_message = {}
+            ack_message = RosMessage(message.sequence_id)
+            self.message_ack_replier.publish(ack_message.to_roslibpy_message())
+
+            # If user reset
+            if message.sequence_id < self.last_message_sequence_id:
+                self.received_command_message_pairs = {}
+                logger.info("Sequence id reset to: %i" % message.sequence_id)
+
+            # Store the received command message pair
+            self.last_message_sequence_id = message.sequence_id
+            self.received_command_message_pairs[message.command] = message
+
             # Relay message to callback
-            self.command_callback(command_dict)
+            self.command_callback(message.command, message)
 
         # Setup listener topic.
-        self.listener = roslibpy.Topic(self, '/clamp_command', 'std_msgs/String')
-        self.listener.subscribe(receive_callback)
+        self.listener = roslibpy.Topic(self, '/clamp_message', 'std_msgs/String')
+        self.listener.subscribe(clamp_command_receive_callback)
 
-        self.status_publisher = roslibpy.Topic(self, '/clamp_status', 'std_msgs/String')
+        self.status_publisher = roslibpy.Topic(self, '/clamp_command_status', 'std_msgs/String')
         self.status_publisher.advertise()
 
-    def reply_ack_result(self, sequence_id, ack_result):
-        reply_message = {'msg':' Clamps Ack result.' }
-        reply_message['sequence_id'] = sequence_id
-        reply_message['timestamp'] = current_milli_time()
-        reply_message['ack'] = ack_result
-        self.replier.publish(roslibpy.Message({'data': json.dumps(reply_message)}))
-
-    def send_status(self, data: dict):
+    def send_command_status(self, command: ROS_COMMAND):
         """ Sends a ROS command to /clamp_command channel and returns the sequence_id of sent message
         instruction_type: str
         instruction_body; str
         """
         # Create message to send
-        data['timestamp'] = current_milli_time()
-        self.status_publisher.publish(roslibpy.Message({'data' : json.dumps(data)}))
+        reply_dict = {}
+
+        # * Due to multi thread operation. It is possible the old command queue is request when sequence_id is reset
+        if command not in self.received_command_message_pairs:
+            logger.info("command_status cannot find %s in sent log. Probably due to a Sequence id reset." % command.__class__.__name__)
+            return
+
+        orig_message = self.received_command_message_pairs[command]
+        # reply_command = ROS_COMMAND_STATUS(command, orig_message.sequence_id)
+        reply_command = ROS_COMMAND()
+        reply_command.status = command.status
+        self.status_publisher.publish(RosMessage.from_command(orig_message.sequence_id, reply_command).to_roslibpy_message())
 
 # Directly calling this script creates a listener that will print out messages.
 # It will also show the one way trip time.
@@ -66,13 +97,13 @@ class RosClampCommandListener(Ros):
 
 if __name__ == "__main__":
 
-    hostip = '192.168.43.141'
+    hostip = '192.168.0.120'
 
     trip_times = []
 
-    def command_callback(command_dict):
-        print(command_dict)
-        trip_time = current_milli_time() - int(command_dict['timestamp'])
+    def command_callback(command: ROS_COMMAND, message: RosMessage):
+        print(command.data)
+        trip_time = current_milli_time() - message.send_time
         trip_times.append(trip_time)
         print("Trip Time = %s" % trip_time)
 

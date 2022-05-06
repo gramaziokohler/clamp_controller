@@ -10,7 +10,7 @@ from tkinter import ttk
 from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
-from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gui
+from clamp_controller.CommanderGUI import ClampControllerBackgroundCommand, create_commander_gui
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
 from SerialCommanderFred import SerialCommanderFred
 
@@ -67,12 +67,12 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
         msg = q.get(timeout=0.1)
         if hasattr(msg, 'type'):
             # Handelling UI_SERIAL_CONNECT
-            if msg.type == BackgroundCommand.UI_SERIAL_CONNECT:
+            if msg.type == ClampControllerBackgroundCommand.UI_SERIAL_CONNECT:
                 logger_ctr.info("Command Received to Connect to %s" % msg.port)
                 commander.connect(msg.port)
 
             # Handelling UI_ROS_CONNECT
-            if msg.type == BackgroundCommand.UI_ROS_CONNECT:
+            if msg.type == ClampControllerBackgroundCommand.UI_ROS_CONNECT:
                 logger_ctr.info("Command Received to Connect to ROS at %s" % msg.ip)
                 # Disconnect from previous host
                 if (commander.ros_client is not None) and (commander.ros_client.is_connected):
@@ -94,7 +94,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                     pass
 
             # Handelling CMD_CLAMP_GOTO
-            if msg.type == BackgroundCommand.CMD_CLAMP_GOTO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_CLAMP_GOTO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -120,7 +120,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                 logger_ctr.info("Movement command executed. position = %smm, clamps = %s, result = %s" % (position, clamps_to_communicate, successes))
 
             # Handelling CMD_STOP
-            if msg.type == BackgroundCommand.CMD_STOP:
+            if msg.type == ClampControllerBackgroundCommand.CMD_STOP:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -132,7 +132,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                 logger_ctr.info("Sending stop command to %s, result = %s" % (clamps_to_communicate, result))
 
             # Handelling CMD_HOME
-            if msg.type == BackgroundCommand.CMD_HOME:
+            if msg.type == ClampControllerBackgroundCommand.CMD_HOME:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -142,7 +142,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                 logger_ctr.info("Sending home command to %s, results = %s" % (clamps_to_communicate, results))
 
             # Handelling CMD_CLAMP_VELO
-            if msg.type == BackgroundCommand.CMD_CLAMP_VELO:
+            if msg.type == ClampControllerBackgroundCommand.CMD_CLAMP_VELO:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -153,7 +153,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                 logger_ctr.info("Sending Velocity command (%s) to %s, results = %s" % (velocity, clamps_to_communicate, results))
 
             # Handelling CMD_POWER
-            if msg.type == BackgroundCommand.CMD_POWER:
+            if msg.type == ClampControllerBackgroundCommand.CMD_POWER:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -165,7 +165,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
 
 
             # Handelling ROS_VEL_GOTO_COMMAND
-            if msg.type == BackgroundCommand.ROS_VEL_GOTO_COMMAND:
+            if msg.type == ClampControllerBackgroundCommand.ROS_VEL_GOTO_COMMAND:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -198,7 +198,7 @@ def handle_background_commands(guiref, commander: SerialCommanderFred, q):
                     logger_ctr.warning("ROS Command Fail: send_clamp_to_jaw_position(%s,%s) Fail" % (clamps, positions))
 
             # Handelling ROS_STOP_COMMAND
-            if msg.type == BackgroundCommand.ROS_STOP_COMMAND:
+            if msg.type == ClampControllerBackgroundCommand.ROS_STOP_COMMAND:
                 if not commander.is_connected:
                     logger_ctr.warning("Connect to Serial Radio first")
                     return True
@@ -350,12 +350,12 @@ def ros_command_callback(message, q=None):
     if message_type == "ROS_VEL_GOTO_COMMAND":
         sequence_id = message['sequence_id']
         instructions = message['instruction_body']
-        q.put(SimpleNamespace(type=BackgroundCommand.ROS_VEL_GOTO_COMMAND, clmap_pos_velo=instructions, sequence_id = sequence_id))
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.ROS_VEL_GOTO_COMMAND, clmap_pos_velo=instructions, sequence_id = sequence_id))
 
     if message_type == "ROS_STOP_COMMAND":
         sequence_id = message['sequence_id']
         clamps_id = message['instruction_body']
-        q.put(SimpleNamespace(type=BackgroundCommand.ROS_STOP_COMMAND, clamps_id=clamps_id, sequence_id = sequence_id))
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.ROS_STOP_COMMAND, clamps_id=clamps_id, sequence_id = sequence_id))
 
 
 if __name__ == "__main__":

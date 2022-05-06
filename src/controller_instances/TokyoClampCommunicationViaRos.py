@@ -14,14 +14,14 @@
 # Directly running this file creates a CLI for sending movement commands.
 
 import time, datetime
-import json 
+import json
 import roslibpy
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 from roslibpy import Ros
 
 class TokyoClampCommunicationViaRos(Ros):
-        
+
     def __init__(self, host_ip:str):
         from twisted.internet import reactor
         reactor.timeout = lambda : 0.00001
@@ -31,15 +31,15 @@ class TokyoClampCommunicationViaRos(Ros):
         # Communication control
         self.sequence_id = -1
 
-        self.sent_messages_ack = {}
+        self.sent_messages = {}
         self.trip_times = []
-        
+
         def callback(message_string):
             receive_time = current_milli_time()
             # Retrive the sent message and compare time
             feedback_message = json.loads(message_string['data'])
             sequence_id = feedback_message['sequence_id']
-            org_message = self.sent_messages_ack[sequence_id]
+            org_message = self.sent_messages[sequence_id]
             org_message['received'] = True
             send_time = int(org_message['timestamp'])
             bounce_time = int(feedback_message['timestamp'])
@@ -54,7 +54,7 @@ class TokyoClampCommunicationViaRos(Ros):
 
             if 'ack' in feedback_message:
                 ack_success = int(feedback_message['ack'])
-                self.sent_messages_ack[sequence_id] = ack_success
+                self.sent_messages[sequence_id] = ack_success
                 print ('Received Message: ack received = %s' % ack_success)
 
         # Setup talker to send message
@@ -79,19 +79,19 @@ class TokyoClampCommunicationViaRos(Ros):
         self.talker.publish(roslibpy.Message({'data' : json.dumps(message)}))
         # Keep track of sent message
         message['received'] = False # Keep track of ACK.
-        self.sent_messages_ack[self.sequence_id] = message
+        self.sent_messages[self.sequence_id] = message
         self.sequence_id += 1
         print("Sent Message to clamp_command:", message)
         return self.sequence_id - 1
-    
+
     # Return true if sending is successful. False if timeout
     def send_ROS_VEL_GOTO_COMMAND_wait(self, clamps_id: str, position: float, velocity: float, timeout_ms: int = 1000) -> bool:
         start_time = current_milli_time()
         sequence_id = self.send_ROS_VEL_GOTO_COMMAND(clamps_id, position, velocity)
         while (current_milli_time() - start_time < timeout_ms):
-            if self.sent_messages_ack[sequence_id] == True:
+            if self.sent_messages[sequence_id] == True:
                 return True
-        
+
         return False
 
     # Returns the sequence_id of sent message
@@ -100,7 +100,7 @@ class TokyoClampCommunicationViaRos(Ros):
         for clamp_id in clamps_id:
             instructions.append((clamp_id, position, velocity))
         return self.send_ros_command("ROS_VEL_GOTO_COMMAND",instructions)
-         
+
     # Returns the sequence_id of sent message
     def send_ROS_STOP_COMMAND(self, clamps_id: str):
         instructions = []
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     while clamps_connection.is_connected:
         i = input("Type a position (95-220) , velocity  (0.1 - 3.0) (to Send a test Message topic=/clamp_command , x to quit.\n")
-        # Function to Stop UI 
+        # Function to Stop UI
         if i == 'x':
             break
         if i == 's':
@@ -146,7 +146,7 @@ if __name__ == "__main__":
                 print ("Bad Input, position range (95-220). Try again:\n")
                 continue
             success = clamps_connection.send_ROS_VEL_GOTO_COMMAND_wait(['1','2'],position, velocity)
-            if success: 
+            if success:
                 print ("send_ROS_VEL_GOTO_COMMAND_wait() Message Success (Clamp Ack)")
             else:
                 print ("send_ROS_VEL_GOTO_COMMAND_wait() Message Fail (NACK)")

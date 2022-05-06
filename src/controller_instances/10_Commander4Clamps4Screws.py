@@ -11,11 +11,11 @@ from types import SimpleNamespace
 
 from clamp_controller.ClampModel import ClampModel
 from clamp_controller.ScrewdriverModel import ScrewdriverModel
-from clamp_controller.CommanderGUI import BackgroundCommand, create_commander_gui
-from clamp_controller.SerialCommander import SerialCommander
+from clamp_controller.CommanderGUI import ClampControllerBackgroundCommand, create_commander_gui
+from clamp_controller.SerialCommander import RosSerialCommander
 from clamp_controller.RosClampCommandListener import RosClampCommandListener
 
-from UI_ROS_Controller import initialize_logging, background_thread
+from controller_instances.UI_ROS_Controller import initialize_logging, background_thread
 
 
 def current_milli_time(): return int(round(time.time() * 1000))
@@ -36,10 +36,10 @@ last_status_update_time = 0
 # * Model Object
 
 
-class SerialCommanderEightTools(SerialCommander):
+class SerialCommanderEightTools(RosSerialCommander):
 
     def __init__(self):
-        SerialCommander.__init__(self)
+        RosSerialCommander.__init__(self)
 
         # * Clamp Calculation
         # 918 step/mm is derived from
@@ -55,10 +55,10 @@ class SerialCommanderEightTools(SerialCommander):
         self.add_clamp(ClampModel('c2', 'CL3', '2', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c3', 'CL3M', '3', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
         self.add_clamp(ClampModel('c4', 'CL3M', '4', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
-        self.add_clamp(ScrewdriverModel('s4', 'SL1_G200', '8', 5685.6, 0, -10, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
+        self.add_clamp(ScrewdriverModel('s4', 'SL1_G200', '8', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
 
         self.ros_client: RosClampCommandListener = None
         self.status_update_interval_low_ms = 950
@@ -67,14 +67,14 @@ class SerialCommanderEightTools(SerialCommander):
 if __name__ == "__main__":
 
     # *Initialize Logger
-    initialize_logging("EightToolCommander." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
+    initialize_logging("ClampController." + datetime.date.today().strftime("%Y-%m-%d") + ".debug.log")
 
     # * Commander Model
     commander = SerialCommanderEightTools()  # Create Model
 
     # * Code to create Controller Object. It returns guiref dictionary for background thread to act on
     root = tk.Tk()  # Root TK Object
-    root.title("Tokyo Clamps Commander")
+    root.title("4 Clamps 4 Screwdriver Commander")
     root.geometry("1800x800")
     q = queue.Queue()  # Command queue
     guiref = create_commander_gui(root, q, commander.clamps.values())
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     t1.start()
 
     # Override default ip
-    guiref['ros']['ros_ip_entry'].set('192.168.0.117')
+    guiref['ros']['ros_ip_entry'].set('192.168.0.120')
     # hostip = '192.168.43.141'
     # try:
     #     commander.ros_client = RosCommandListener(hostip, partial(ros_command_callback, q = q))

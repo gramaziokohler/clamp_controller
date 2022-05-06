@@ -12,6 +12,7 @@ from serial_radio_transport_driver.Message import Message
 from serial_radio_transport_driver.ReliableMessenger import ReliableMessenger
 from serial_radio_transport_driver.SerialTransport import SerialRadioTransport
 
+from clamp_controller.RosCommand import *
 
 def current_milli_time(): return int(round(time.time() * 1000))
 
@@ -28,8 +29,6 @@ class SerialCommander(object):
         self.logger = logging.getLogger("app.cmd")
         self.status_update_high_freq: bool = False  # Flag that indicate update status interval to be in high frequency (when clamps are in motion)
         self.sync_move_inaction = False             # Flag to indicate sync move in action and monitor if any clamp stopped.
-        self.sync_move_clamp_pos_velo_list = None  # type: List[Tuple[ClampModel, float, float]]
-        self.last_command_success = True
         pass
 
     @property
@@ -104,6 +103,9 @@ class SerialCommander(object):
         clamp.last_comm_latency = 0
         self.clamps[clamp.receiver_address] = clamp
 
+    def get_clamps(self) -> List[ClampModel]:
+        return self.clamps.values()
+
     def get_clamp_by_process_tool_id(self, process_tool_id: str):
         for clamp in self.clamps.values():
             if clamp.process_tool_id == process_tool_id:
@@ -147,27 +149,6 @@ class SerialCommander(object):
         If some clamps are running, update frequency will increase automatically.
         """
         results = self.update_clamps_status(self.clamps.values(), retry=retry, time_out_millis=time_out_millis)
-        return results
-
-    def update_active_clamps_status(self, retry: int = 0, time_out_millis: int = 40) -> List[ClampModel]:
-        """ Update the status of all active clamps:
-
-        - If self.sync_move_inaction == true, then active_clamps == clamps in the sync_move_list
-        - Else  active_clamps == clamps where clamp.isMotorRunning == true
-
-        Returns a list of clamps that have been successfully updated.
-
-        If some clamps are running, update frequency will increase automatically.
-        """
-        results = []
-
-        if self.sync_move_inaction:
-            sync_move_list = [clamp for (clamp, pos, velo) in self.sync_move_clamp_pos_velo_list]
-            active_clamps = [clamp for clamp in self.clamps.values() if clamp in sync_move_list]
-        else:
-            active_clamps = [clamp for clamp in self.clamps.values() if clamp.isMotorRunning]
-
-        results = self.update_clamps_status(active_clamps, retry=retry, time_out_millis=time_out_millis)
         return results
 
     def update_clamp_status(self, clamp: ClampModel, retry: int = 0, time_out_millis: int = 40) -> bool:
@@ -249,6 +230,9 @@ class SerialCommander(object):
                 return False
 
         # Keep the status of this sync move for later monitoring
+        # These parameters are kept around to be compatible with manually initiated movement commands
+        # TODO Change the manually initiated commands to a proper class with a Base Class.
+
         self.sync_move_inaction = True
         self.sync_move_clamp_pos_velo_list = clamp_pos_velo_list
         # If nothing went wrong, this is a success
@@ -352,8 +336,33 @@ class SerialCommander(object):
             successes.append(success)
         return successes
 
+    def override_clamp_current_position(self, clamp: ClampModel, position: float, retry: int = 3) -> bool:
+        """ Override the current position of a clamp / screwdriver
+        """
+
+        # Convert units
+        step = int(position * clamp.StepPerMM)
+
+        # Send message to clamp
+        message = "t" + str(step)
+        response = self.message_clamp(clamp, message, retry=retry)
+        success = response is not None
+
+        self.logger.info("override_clamp_current_position(%s,%s), message = %s, success = %s" % (clamp, step, message, success))
+        return success
+
+    def override_clamps_current_position(self, clamps: List[ClampModel], position: float, retry: int = 3) -> List[bool]:
+        """Override the current position of multiple clamp / screwdriver
+        Return a list of boolean values whether the command is successfully ACKed.
+        """
+        successes = []
+        for clamp in clamps:
+            success = self.override_clamp_current_position(clamp, position, retry=retry)
+            successes.append(success)
+        return successes
+
     def set_screwdriver_gripper(self, devices: List[ScrewdriverModel], extend: bool, retry: int = 3) -> List[bool]:
-        """Stop multiple clamps
+        """Move Screwdriver Gripper to Extend or Retract State Location
         """
         successes = []
         for device in devices:
@@ -399,3 +408,34 @@ class SerialCommander(object):
             success = self.set_clamp_power(clamp, power_pct)
             successes.append(success)
         return successes
+
+
+class RosSerialCommander(SerialCommander):
+
+    def __init__(self):
+        SerialCommander.__init__(self)
+        from clamp_controller.RosClampCommandListener import RosClampCommandListener
+        self.ros_client = None  # type: RosClampCommandListener
+
+        self.last_ros_command = None  # type: ROS_COMMAND
+
+    def send_command_status_to_ros(self, command: ROS_COMMAND):
+        if self.ros_client is not None:
+            self.ros_client.send_command_status(command)
+
+    def change_command_status_and_send_to_ros(self, command:ROS_COMMAND, status: int):
+        command.status = status
+        self.send_command_status_to_ros(command)
+
+    def fail_last_running_command(self) -> None:
+        if self.last_ros_command is not None:
+            if self.last_ros_command.status == ROS_COMMAND.RUNNING or self.last_ros_command.status == ROS_COMMAND.NOT_STARTED :
+                self.change_command_status_and_send_to_ros(self.last_ros_command, ROS_COMMAND.FAILED)
+
+    def get_running_command(self) -> ROS_COMMAND:
+        if self.last_ros_command is None:
+            return None
+        if self.last_ros_command.status == ROS_COMMAND.RUNNING:
+            return self.last_ros_command
+        else:
+            return None

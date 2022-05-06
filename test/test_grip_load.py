@@ -6,10 +6,10 @@ from datetime import datetime
 
 
 
-ros = RosClient("192.168.0.117")
+ros = RosClient("192.168.0.120")
 ros.run()
 
-robot_11 = rrc.AbbClient(ros, '/robot_11')
+robot_11 = rrc.AbbClient(ros, '/rob1')
 
 print('Connected.')
 time.sleep(1.5)
@@ -19,12 +19,13 @@ time.sleep(1.5)
 robot = robot_11
 # The mass (weight) of the load in kg.
 # Must be bigger then 0
-mass = 1.2
+# mass = 57.1
+mass = 37
 # The center of gravity of the payload expressed in mm in the tool coordinate system.
 # Minimum 1 value bigger then 0
-cog_x = 1
+cog_x = -770
 cog_y = 0
-cog_z = 0
+cog_z = 240
 # The orientation of the axes of moment.
 # These are the principal axes of the payload moment of inertia with origin in center of gravity.
 # Expressed in quaternians
@@ -39,8 +40,8 @@ aom_q4 = 0
 # Normally, the moments of inertia must only be defined when the distance from the mounting flange to the center of gravity
 # is less than the maximal dimension of the load.
 inertia_x = 0
-inertia_y = 0
-inertia_z = 0
+inertia_y = 155
+inertia_z = 155
 # Grip load instruction
 results = []
 results.append(robot.send(rrc.CustomInstruction('r_A067_TPPlot',['Start'],[], feedback_level=1)))
