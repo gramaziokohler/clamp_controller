@@ -14,14 +14,25 @@ https://chev.me/arucogen/
     conda activate opencv
     pip install opencv-contrib-python
 
-## Network
+## Camera Network
     Router ssid = itj
     Router pwd = integral_timber_joints
-    Router configured to fix ip of  B8:27:EB:F4:8D:FB  at  192.168.1.102
+    Camera on Toolchanger IP 192.168.1.100
 
-## Calibration
 
-    python calibration.py --url tcp://192.168.1.102:5000 --square_size 12.843 --save_file calibration_1280x720.yml --width 9 --height 6
+## Calibration (Camera Intrinsic after changing focus)
+
+    conda activate opencv
+
+    python -m visual_docking.calibration --url http://192.168.1.100 --square_size 3 --width 9 --height 6 --save_file cam100_1600x1200.yml
+    
+    python -m visual_docking.calibration --url http://192.168.1.101 --square_size 5 --width 8 --height 6 --save_file cam101_1600x1200.yml
+
+    python -m visual_docking.calibration --url http://192.168.1.102 --square_size 5 --width 8 --height 6 --save_file cam102_1600x1200.yml
+
+    python -m visual_docking.calibration --url http://192.168.1.103 --square_size 5 --width 8 --height 6 --save_file cam103_1600x1200.yml
+
+    python -m visual_docking.calibration --url http://192.168.1.104 --square_size 5 --width 8 --height 6 --save_file cam104_1600x1200.yml
 
 ## Usage
 
