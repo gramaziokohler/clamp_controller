@@ -55,9 +55,9 @@ class VideoCapture:
             self.capture_lock.acquire()
             success, frame = self.cap.read()
             self.capture_lock.release()
-
-            print("Frame %i arrived after %.2f. Success = %s" % (self.tick+1, (time.time() - start), success))
-            if not success:
+            if success:
+                print("Frame %i arrived after %.2f. Success = %s" % (self.tick+1, (time.time() - start), success))
+            else:
                 continue
 
             if self.terminate:
@@ -112,8 +112,9 @@ if __name__ == '__main__':
     parser.add_argument('--marker_size', default=10.0, type=float, help='Real size of the printed marker')
     parser.add_argument('--marker_spacing', default=2.0, type=float, help='Spacing between markers (convention is mm)')
     parser.add_argument('--ros_ip', type=str, default='192.168.0.120', help='IP address of the ROS network')
-    parser.add_argument('--ros_topic', type=str, default='tc_frame', help='IP address of the ROS network')
+    parser.add_argument('--ros_topic', type=str, default='camera_frame', help='IP address of the ROS network')
 
+    parser.add_argument('--display_org_size', action='store_true',  help='If set, the original image size is shown')
     parser.add_argument('--output_board', action='store_true',  help='If set, a png image of the ArUco Board will be saved.')
 
     args = parser.parse_args()
@@ -148,7 +149,7 @@ if __name__ == '__main__':
     
     retval = 0
     last_capture_time = time.time()
-    reconnect_timeout = 5.0
+    reconnect_timeout = 8.0
     while True:
         success, frame = vcap.read()  # Reads one JPEG of the M-JPEG stream
 
@@ -163,8 +164,8 @@ if __name__ == '__main__':
             vcap.restart()
             continue
         
-        # Restart after a certain frame count
-        if vcap.tick - vcap.last_restart_tick > 20:
+        # Restart after a certain frame count because FPS will go slow after a while
+        if vcap.tick - vcap.last_restart_tick > 50:
             print("Periodically initiated Camera Restart")
             vcap.restart()
             continue
@@ -174,7 +175,9 @@ if __name__ == '__main__':
             unsuccessful_time = (time.time() - last_capture_time)
             if unsuccessful_time > reconnect_timeout:
                 print("No frame in %s secs. Connection probably lost. Will attempt to restart capture stream." % ((time.time() - last_capture_time)))
-                vcap.restart(2)
+                vcap.restart(1.0)
+                last_capture_time = time.time() # Reset timeout counter
+                print ("Timeout reset complete.")
                 time.sleep(1) # Wait for some time after thread restart
                 # last_capture_time = time.time() #Pretend this is successful and give it more time to read
 
@@ -207,12 +210,23 @@ if __name__ == '__main__':
 
             # Change frame to the one drawn with markers
             frame = frame_with_markers
+        else:
+            retval = 0
 
-        resized_frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_AREA)
-        put_text(resized_frame, '%i Markers' % retval, (20, 440))
-        fps = 1 / (time.time() - last_capture_time)
-        put_text(resized_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20, 40))
-        cv2.imshow('%s -> %s' % (args.url, args.ros_topic), resized_frame)
+
+
+        if args.display_org_size:
+            preview_frame = frame
+            put_text(preview_frame, '%i Marker(s)' % retval, (20, 80))
+            fps = 1 / (time.time() - last_capture_time)
+            put_text(preview_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20, 40))
+        else:
+            preview_frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_AREA)
+            put_text(preview_frame, '%i Marker(s)' % retval, (20, 440))
+            fps = 1 / (time.time() - last_capture_time)
+            put_text(preview_frame, '%.1fFPS (Frame%i)' % (fps, vcap.tick), (20, 40))
+
+        cv2.imshow('%s -> %s' % (args.url, args.ros_topic), preview_frame)
 
         # New start time
         last_capture_time = time.time()
