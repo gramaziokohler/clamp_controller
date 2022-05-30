@@ -218,9 +218,9 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="200mm", command=lambda: on_clamp_goto_button_click(200)).pack(side=tk.LEFT)
     tk.Button(frame, text="220mm", command=lambda: on_clamp_goto_button_click(220)).pack(side=tk.LEFT)
 
-    ui_handles['custom_pos'] = tk.StringVar(value="100.5")
-    tk.Entry(frame, textvariable=ui_handles['custom_pos'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_clamp_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
+    ui_handles['custom_pos_clamp'] = tk.StringVar(value="100.5")
+    tk.Entry(frame, textvariable=ui_handles['custom_pos_clamp'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_clamp_goto_button_click(float(ui_handles['custom_pos_clamp'].get()))).pack(side=tk.LEFT)
 
     def on_clamp_velo_button_click(velocity):
         logger_ui.info("Button Pressed: Set Velocity %s" % velocity)
@@ -233,9 +233,9 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="4mm/s", command=lambda: on_clamp_velo_button_click(4)).pack(side=tk.LEFT)
     tk.Button(frame, text="5mm/s", command=lambda: on_clamp_velo_button_click(5)).pack(side=tk.LEFT)
 
-    ui_handles['custom_vel'] = tk.StringVar(value="2.5")
-    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_clamp_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+    ui_handles['custom_vel_clamp'] = tk.StringVar(value="2.5")
+    tk.Entry(frame, textvariable=ui_handles['custom_vel_clamp'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_clamp_velo_button_click(float(ui_handles['custom_vel_clamp'].get()))).pack(side=tk.LEFT)
 
     # * Row for Screwdriver Control
     # * ---------------------
@@ -256,9 +256,9 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="200mm", command=lambda: on_screwdriver_goto_button_click(200)).pack(side=tk.LEFT)
     tk.Button(frame, text="250mm", command=lambda: on_screwdriver_goto_button_click(250)).pack(side=tk.LEFT)
 
-    ui_handles['custom_pos'] = tk.StringVar(value="10.5")
-    tk.Entry(frame, textvariable=ui_handles['custom_pos'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_screwdriver_goto_button_click(float(ui_handles['custom_pos'].get()))).pack(side=tk.LEFT)
+    ui_handles['custom_pos_screwdriver'] = tk.StringVar(value="10.5")
+    tk.Entry(frame, textvariable=ui_handles['custom_pos_screwdriver'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_screwdriver_goto_button_click(float(ui_handles['custom_pos_screwdriver'].get()))).pack(side=tk.LEFT)
 
     # Buttons - Screwdriver Set Velocity
     def on_screwdriver_velo_button_click(velocity):
@@ -272,9 +272,9 @@ def create_ui_control(root, q: Queue):
     tk.Button(frame, text="0.85mm/s", command=lambda: on_screwdriver_velo_button_click(0.85)).pack(side=tk.LEFT)
     tk.Button(frame, text="0.90mm/s", command=lambda: on_screwdriver_velo_button_click(0.90)).pack(side=tk.LEFT)
 
-    ui_handles['custom_vel'] = tk.StringVar(value="0.80")
-    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+    ui_handles['custom_vel_screwdriver'] = tk.StringVar(value="0.80")
+    tk.Entry(frame, textvariable=ui_handles['custom_vel_screwdriver'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_screwdriver_velo_button_click(float(ui_handles['custom_vel_screwdriver'].get()))).pack(side=tk.LEFT)
 
     # Buttons - Screwdriver Override current Position
     def on_screwdriver_set_pos_button_click(position):
@@ -282,9 +282,9 @@ def create_ui_control(root, q: Queue):
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_SCREWDRIVER_OVERRIDE_CURRENT_POS, position=position))
 
     tk.Label(frame, text="Override Current Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    ui_handles['custom_vel'] = tk.StringVar(value="0")
-    tk.Entry(frame, textvariable=ui_handles['custom_vel'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm (override)", command=lambda: on_screwdriver_set_pos_button_click(float(ui_handles['custom_vel'].get()))).pack(side=tk.LEFT)
+    ui_handles['override_val_screwdriver'] = tk.StringVar(value="0")
+    tk.Entry(frame, textvariable=ui_handles['override_val_screwdriver'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (override)", command=lambda: on_screwdriver_set_pos_button_click(float(ui_handles['override_val_screwdriver'].get()))).pack(side=tk.LEFT)
 
     # Buttons - Screwdriver Gripper Extend Retract
     def on_gripper_button_click(extend: bool):
