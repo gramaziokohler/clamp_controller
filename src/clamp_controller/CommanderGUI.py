@@ -204,7 +204,7 @@ def create_ui_control(root, q: Queue):
     frame = ttk.Frame(frame_outside, borderwidth=2, relief='solid')
     frame.pack(fill=tk.BOTH, expand=0, side=tk.TOP, padx=6, pady=3)
 
-    # Buttons
+    # Buttons - Clamp Go To Position
     def on_clamp_goto_button_click(position):
         logger_ui.info("Button Pressed: Clamp Go to Position %s" % position)
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_CLAMP_GOTO, position=position))
@@ -223,17 +223,7 @@ def create_ui_control(root, q: Queue):
     tk.Entry(frame, textvariable=ui_handles['custom_pos_clamp'], width=10,  justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm (Custom Pos)", command=lambda: on_clamp_goto_button_click(float(ui_handles['custom_pos_clamp'].get()))).pack(side=tk.LEFT)
 
-    # Buttons - Screwdriver Override current Position
-    def on_clamp_set_pos_button_click(position):
-        logger_ui.info("Button Pressed: Override current Position %s" % position)
-        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_CLAMP_OVERRIDE_CURRENT_POS, position=position))
-
-    tk.Label(frame, text="Override Current Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-    ui_handles['override_val_clamp'] = tk.StringVar(value="100")
-    tk.Entry(frame, textvariable=ui_handles['override_val_clamp'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
-    tk.Button(frame, text="mm (override)", command=lambda: on_clamp_set_pos_button_click(float(ui_handles['override_val_clamp'].get()))).pack(side=tk.LEFT)
-
-
+    # Buttons - Clamp Set Velocity
     def on_clamp_velo_button_click(velocity):
         logger_ui.info("Button Pressed: Set Velocity %s" % velocity)
         q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_CLAMP_VELO, velocity=velocity))
@@ -248,6 +238,18 @@ def create_ui_control(root, q: Queue):
     ui_handles['custom_vel_clamp'] = tk.StringVar(value="2.5")
     tk.Entry(frame, textvariable=ui_handles['custom_vel_clamp'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
     tk.Button(frame, text="mm/s (Custom Vel)", command=lambda: on_clamp_velo_button_click(float(ui_handles['custom_vel_clamp'].get()))).pack(side=tk.LEFT)
+
+    # Buttons - Clamp Override current Position
+    def on_clamp_set_pos_button_click(position):
+        logger_ui.info("Button Pressed: Override current Position %s" % position)
+        q.put(SimpleNamespace(type=ClampControllerBackgroundCommand.CMD_CLAMP_OVERRIDE_CURRENT_POS, position=position))
+
+    tk.Label(frame, text="Override Current Position: ", font=tk.font_key, anchor=tk.SE).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+    ui_handles['override_val_clamp'] = tk.StringVar(value="100")
+    tk.Entry(frame, textvariable=ui_handles['override_val_clamp'], width=10, justify=tk.CENTER).pack(side=tk.LEFT)
+    tk.Button(frame, text="mm (override)", command=lambda: on_clamp_set_pos_button_click(float(ui_handles['override_val_clamp'].get()))).pack(side=tk.LEFT)
+
+
 
     # * Row for Screwdriver Control
     # * ---------------------
