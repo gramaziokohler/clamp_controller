@@ -260,6 +260,19 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 logger_ctr.info("Sending Override Current Position to Screwdrivers %s, position = %s, results = %s" % (clamps_to_communicate, position, results))
                 return True
 
+            # * Handelling CMD_CLAMP_OVERRIDE_CURRENT_POS
+            if msg.type == ClampControllerBackgroundCommand.CMD_CLAMP_OVERRIDE_CURRENT_POS:
+                if not commander.is_connected:
+                    logger_ctr.warning("Connect to Serial Radio first")
+                    return True
+                # Instruct commander to send command
+                position = msg.position
+                clamps_to_communicate = get_checkbox_selected_clamps(guiref, commander)
+                clamps_to_communicate = [clamp for clamp in clamps_to_communicate if clamp.__class__ == ClampModel]
+                results = commander.override_clamps_current_position(clamps_to_communicate, position)
+                logger_ctr.info("Sending Override Current Position to Clamps %s, position = %s, results = %s" % (clamps_to_communicate, position, results))
+                return True
+
             # * Handelling CMD_SCREWDRIVER_GRIPPER
             if msg.type == ClampControllerBackgroundCommand.CMD_SCREWDRIVER_GRIPPER:
                 if not commander.is_connected:
