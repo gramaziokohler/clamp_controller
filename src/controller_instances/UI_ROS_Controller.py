@@ -362,7 +362,7 @@ def handle_background_commands(guiref, commander: RosSerialCommander, q):
                 logger_ctr.info("ROS_VEL_GOTO_COMMAND Command Success")
             else:
                 # Log
-                clamps = [commander.clamps[clamp_id] for clamp_id, position, velocity in clamps_pos_velo]
+                clamps = [commander.get_clamp_by_process_tool_id(clamp_id) for clamp_id, position, velocity in clamps_pos_velo]
                 positions = [position for clamp_id, position, velocity in clamps_pos_velo]
                 logger_ctr.warning("ROS Command Fail: send_clamp_to_jaw_position(%s,%s) Fail" % (clamps, positions))
                 commander.change_command_status_and_send_to_ros(command, ROS_COMMAND.FAILED)
