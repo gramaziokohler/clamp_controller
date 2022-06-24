@@ -9,7 +9,7 @@ from compas_fab.backends import RosClient
 from roslibpy import Topic
 import urllib.request
 
-from aruco_markers import *
+from visual_docking.aruco_markers import *
 
 import queue
 import threading

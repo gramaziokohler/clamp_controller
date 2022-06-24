@@ -47,21 +47,14 @@ https://chev.me/arucogen/
     python pose_from_network.py --url tcp://192.168.1.102:5000 --calibration_file calibration_1280x720.yml --marker_size 43.2 --ros_ip 192.168.1.2
 
     conda activate opencv
-    cd ..\clamp_controller\
-    python src\visual_docking\aruco_board_pose_from_network.py --url http://192.168.1.100 --calibration_file src/visual_docking/calibrations/cam1_70mm_1600_1200.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2
 
-    conda activate opencv
-    cd ..\clamp_controller\
-    python src\visual_docking\aruco_board_pose_from_network.py --url http://192.168.1.101 --calibration_file src/visual_docking/calibrations/cam1_70mm_1600_1200.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2
+    python -m visual_docking.aruco_board_pose_from_network --ros_ip 192.168.1.2  --url http://192.168.1.100 --calibration_file ~/clamp_controller/calibrations/cam100_1600x1200.yml --marker_size 10.0 --marker_spacing 2.0 --markers_count_x 4 --markers_count_y 2 --ros_topic TC4_Camera
+    
+    python -m visual_docking.aruco_board_pose_from_network --ros_ip 192.168.1.2  --url http://192.168.1.101 --calibration_file ~/clamp_controller/calibrations/cam101_1600x1200.yml --marker_size 25.0 --marker_spacing 5.0 --markers_count_x 3 --markers_count_y 1 --ros_topic c1
 
-    conda activate opencv
-    cd ..\clamp_controller\
-    python src\visual_docking\aruco_board_pose_from_network.py --url http://192.168.1.102 --calibration_file src/visual_docking/calibrations/cam1_70mm_1600_1200.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2
+    python -m visual_docking.aruco_board_pose_from_network --ros_ip 192.168.1.2  --url http://192.168.1.102 --calibration_file ~/clamp_controller/calibrations/cam102_1600x1200.yml --marker_size 25.0 --marker_spacing 5.0 --markers_count_x 3 --markers_count_y 1 --ros_topic c2
 
-    conda activate opencv
-    cd ..\clamp_controller\
-    python src\visual_docking\aruco_board_pose_from_network.py --url http://192.168.1.103 --calibration_file src/visual_docking/calibrations/cam1_70mm_1600_1200.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2
+    python -m visual_docking.aruco_board_pose_from_network --ros_ip 192.168.1.2  --url http://192.168.1.103 --calibration_file ~/clamp_controller/calibrations/cam103_1600x1200.yml --marker_size 25.0 --marker_spacing 5.0 --markers_count_x 3 --markers_count_y 1 --ros_topic c3
 
-    conda activate opencv
-    cd ..\clamp_controller\
-    python src\visual_docking\aruco_board_pose_from_network.py --url http://192.168.1.104 --calibration_file src/visual_docking/calibrations/cam1_70mm_1600_1200.yml --marker_size 10.0 --marker_spacing 2.0 --ros_ip 192.168.1.2
+    python -m visual_docking.aruco_board_pose_from_network --ros_ip 192.168.1.2  --url http://192.168.1.104 --calibration_file ~/clamp_controller/calibrations/cam104_1600x1200.yml --marker_size 25.0 --marker_spacing 5.0 --markers_count_x 3 --markers_count_y 1 --ros_topic c4
+
