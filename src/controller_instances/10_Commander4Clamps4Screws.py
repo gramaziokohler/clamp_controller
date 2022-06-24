@@ -51,10 +51,10 @@ class SerialCommanderEightTools(RosSerialCommander):
 
         # Batt Min Max Value 860 to 1004 is calibrated according to the LiPo Charger's percentage reference
         # It is safe to use the battery to 0% as indicated here.
-        self.add_clamp(ClampModel('c1', 'CL3', '1', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ClampModel('c2', 'CL3', '2', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ClampModel('c3', 'CL3M', '3', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
-        self.add_clamp(ClampModel('c4', 'CL3M', '4', 918, 0, 94.0, 225.0, 860.0, 1004.0,))
+        self.add_clamp(ClampModel('c1', 'CL3', '1', 918, 0, 94.0, 232.0, 860.0, 1004.0,))
+        self.add_clamp(ClampModel('c2', 'CL3', '2', 918, 0, 94.0, 232.0, 860.0, 1004.0,))
+        self.add_clamp(ClampModel('c3', 'CL3M', '3', 918, 0, 94.0, 232.0, 860.0, 1004.0,))
+        self.add_clamp(ClampModel('c4', 'CL3M', '4', 918, 0, 94.0, 232.0, 860.0, 1004.0,))
         self.add_clamp(ScrewdriverModel('s1', 'SL1', '5', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
         self.add_clamp(ScrewdriverModel('s2', 'SL1', '6', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
         self.add_clamp(ScrewdriverModel('s3', 'SL1', '7', 5685.6, 0, -300, 300, 860.0, 1004.0, 2501.9))
